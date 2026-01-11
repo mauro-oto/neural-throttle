@@ -843,6 +843,14 @@ body {
   font-size: 10px;
 }
 
+.title-credits {
+  margin-top: 40px;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  opacity: 0.6;
+}
+
 /* ===========================================
    Mission Select Screen
    =========================================== */
