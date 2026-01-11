@@ -76,6 +76,10 @@ const CONFIG = {
   SYNC_RESTORE: 70,       // Increased from 56
   SYNC_COOLDOWN: 6,       // Reduced from 8
 
+  // Killall command - Panic button
+  KILLALL_RAM_COST: 40,   // Moderate RAM cost
+  KILLALL_COOLDOWN: 75,   // 75 seconds - use sparingly
+
   // WPM Bonus System - Rewards fast typing with more damage
   // Uses rolling window to measure ACTUAL typing speed, not penalized by cooldowns
   WPM_BONUS_ENABLED: true,
@@ -227,6 +231,47 @@ const tutorial = {
       awaitCommand: null, // Just acknowledge
       successMessage: null
     },
+    killallIntro: {
+      trigger: 'manyEnemies',
+      messages: [
+        '╔════════════════════════════════════╗',
+        '║      TUTORIAL: PANIC BUTTON        ║',
+        '╚════════════════════════════════════╝',
+        '',
+        'Multiple hostiles detected! Feeling overwhelmed?',
+        '',
+        'Type "killall" to terminate ALL enemies instantly.',
+        'Cost: 40 MB RAM, Cooldown: 75 seconds',
+        '',
+        'This is your emergency panic button.',
+        'Use it wisely - the long cooldown means',
+        'you can only use it once or twice per mission!',
+        '',
+        '>>> Try it now: killall (FREE this time!)'
+      ],
+      awaitCommand: /^killall$/,
+      successMessage: 'All hostiles terminated! Remember: killall has a 75s cooldown.'
+    },
+    speedTutorial: {
+      trigger: 'doingWell',
+      messages: [
+        '╔════════════════════════════════════╗',
+        '║       TUTORIAL: GAME SPEED         ║',
+        '╚════════════════════════════════════╝',
+        '',
+        'You\'re doing great! Core at full health.',
+        '',
+        'Want more challenge? Speed up the game!',
+        '',
+        'Type "speed 2" for 2x speed (faster & harder)',
+        'Type "speed 1" to return to normal',
+        'Type "speed 0" or "pause" to pause',
+        '',
+        '>>> Try: speed 2'
+      ],
+      awaitCommand: /^speed\s+2$/,
+      successMessage: 'Now we\'re moving! Use "speed 1" if things get too intense.'
+    },
     tutorialComplete: {
       trigger: 'complete',
       messages: [
@@ -241,6 +286,7 @@ const tutorial = {
         '  sync           - Restore RAM',
         '  build cannon   - Build tower',
         '  upgrade cannon - Upgrade towers',
+        '  killall        - PANIC BUTTON (40 MB, 75s cd)',
         '  pause          - Pause the game',
         '',
         'PRO TIPS:',
@@ -257,13 +303,14 @@ const tutorial = {
   },
 
   show(stepName) {
-    // Don't show if tutorial is globally completed (from previous session)
-    // unless this is a forced replay
-    if (this.globallyCompleted && !this.forceReplay) return;
     if (!this.enabled || this.completedSteps.has(stepName)) return;
 
     const step = this.steps[stepName];
     if (!step) return;
+
+    // Once tutorial is globally completed, ALL tutorials are blocked (unless force replay)
+    // This ensures tutorials only show once per "save", not once per session
+    if (this.globallyCompleted && !this.forceReplay) return;
 
     this.paused = true;
     this.currentStep = stepName;
@@ -332,6 +379,7 @@ const tutorial = {
     gameState.paused = false;
 
     // Check if all main tutorials are done
+    // Note: killallIntro is optional - doesn't block tutorial completion
     const mainSteps = ['firstEnemy', 'lowRam', 'canBuildTower', 'firstShielded', 'firstHeavy'];
     const allDone = mainSteps.every(s => this.completedSteps.has(s));
     if (allDone && !this.completedSteps.has('tutorialComplete')) {
@@ -370,9 +418,11 @@ const tutorial = {
 
   // Check for tutorial triggers during gameplay
   checkTriggers() {
+    // Skip all trigger checks if tutorials are disabled or already completed
     if (!this.enabled || this.paused) return;
-    // Skip triggers if globally completed (unless force replay)
     if (this.globallyCompleted && !this.forceReplay) return;
+
+    const config = getConfig();
 
     // First enemy (grunt) - show rm tutorial
     if (!this.completedSteps.has('firstEnemy') && gameState.minions.length > 0) {
@@ -380,44 +430,62 @@ const tutorial = {
       return;
     }
 
-    // Low RAM - show sync tutorial (trigger at 50% RAM or less, much more reliable)
-    const config = getConfig();
+    // Low RAM - show sync tutorial (trigger at 50% RAM or less)
     const maxRam = config.RAM_MAX || CONFIG.RAM_MAX;
-    const ramThreshold = Math.min(50, maxRam * 0.5);  // 50 MB or 50% of max, whichever is lower
-    
+    const ramThreshold = Math.min(50, maxRam * 0.5);
+
     if (!this.completedSteps.has('lowRam') &&
         this.completedSteps.has('firstEnemy') &&
         gameState.ram <= ramThreshold &&
         gameState.cooldowns.sync === 0 &&
-        !config.DISABLE_SYNC) {  // Don't show if sync is disabled
+        !config.DISABLE_SYNC) {
       this.show('lowRam');
       return;
     }
 
-    // Can afford tower - show build tutorial (only when player has enough)
+    // Can afford tower - show build tutorial
     const towerCost = config.TOWER_BASE_COST || CONFIG.TOWER_BASE_COST;
     if (!this.completedSteps.has('canBuildTower') &&
         this.completedSteps.has('firstEnemy') &&
         gameState.money >= towerCost &&
         gameState.towerCount === 0 &&
-        !config.DISABLE_TOWERS) {  // Don't show if towers are disabled
+        !config.DISABLE_TOWERS) {
       this.show('canBuildTower');
       return;
     }
 
-    // First shielded enemy
+    // First shielded enemy - teaches rm -f
     if (!this.completedSteps.has('firstShielded') &&
-        this.completedSteps.has('firstEnemy') &&
         gameState.minions.some(m => m.type === 'shielded')) {
       this.show('firstShielded');
       return;
     }
 
-    // First heavy enemy
+    // First heavy enemy - teaches tower immunity
     if (!this.completedSteps.has('firstHeavy') &&
-        this.completedSteps.has('firstEnemy') &&
         gameState.minions.some(m => m.type === 'heavy')) {
       this.show('firstHeavy');
+      return;
+    }
+
+    // Killall tutorial - trigger when 5+ enemies on screen
+    if (!this.completedSteps.has('killallIntro') &&
+        gameState.minions.length >= 5 &&
+        gameState.cooldowns.killall === 0) {
+      this.show('killallIntro');
+      return;
+    }
+
+    // Speed tutorial - trigger when player is doing well
+    // (full health after wave 3+, at 1x speed)
+    const maxCore = config.CORE_HP_MAX || CONFIG.CORE_HP_MAX;
+    if (!this.completedSteps.has('speedTutorial') &&
+        gameState.waveIndex >= 3 &&
+        gameState.coreHp >= maxCore &&
+        gameState.speedMultiplier === 1 &&
+        !gameState.paused &&
+        gameState.minions.length === 0) {  // Between waves
+      this.show('speedTutorial');
       return;
     }
   }
@@ -463,7 +531,8 @@ const gameState = {
   cooldowns: {
     rm: 0,
     rmForce: 0,
-    sync: 0
+    sync: 0,
+    killall: 0
   },
 
   // Scaling multipliers
@@ -489,7 +558,12 @@ const gameState = {
   },
 
   // UI preview state - for highlighting target while typing
-  previewTargetIndex: null
+  previewTargetIndex: null,
+
+  // Notification state - track one-time notifications
+  notifications: {
+    canAffordTower: false  // Has player been notified they can afford a tower?
+  }
 };
 
 // Helper to get current config (either modified by mission or default)
@@ -523,6 +597,7 @@ function initDOMElements() {
     cdRm: document.getElementById('cdRm'),
     cdRmF: document.getElementById('cdRmF'),
     cdSync: document.getElementById('cdSync'),
+    cdKillall: document.getElementById('cdKillall'),
     gameStatus: document.getElementById('gameStatus'),
     speedValue: document.getElementById('speedValue')
   };
@@ -663,18 +738,21 @@ function recordTypingInput(charCount) {
 const GameAPI = {
   attack(index, force = false) {
     const config = getConfig();
-    
+
     // Check if force rm is disabled by mission
     if (force && config.DISABLE_FORCE_RM) {
       this.log('rm -f: command disabled for this mission', 'error');
       return false;
     }
-    
+
     const cooldownKey = force ? 'rmForce' : 'rm';
-    const cooldownTime = force ? CONFIG.RM_FORCE_COOLDOWN : CONFIG.RM_COOLDOWN;
+    // Use config values for cooldowns (Campaign+ modifies these)
+    const cooldownTime = force
+      ? (config.RM_FORCE_COOLDOWN || CONFIG.RM_FORCE_COOLDOWN)
+      : (config.RM_COOLDOWN || CONFIG.RM_COOLDOWN);
     const ramCost = force ? CONFIG.RM_FORCE_RAM_COST : CONFIG.RM_RAM_COST;
-    const baseDamage = force 
-      ? CONFIG.RM_FORCE_DAMAGE 
+    const baseDamage = force
+      ? CONFIG.RM_FORCE_DAMAGE
       : (config.RM_DAMAGE || CONFIG.RM_DAMAGE);
 
     if (gameState.cooldowns[cooldownKey] > 0) {
@@ -721,13 +799,13 @@ const GameAPI = {
 
   buildTower(type) {
     const config = getConfig();
-    
+
     // Check if towers are disabled by mission
     if (config.DISABLE_TOWERS) {
       this.log('build: tower construction disabled for this mission', 'error');
       return false;
     }
-    
+
     if (gameState.towerCount >= CONFIG.TOWER_MAX) {
       this.log(`build: max towers reached (${CONFIG.TOWER_MAX}). Use "upgrade cannon" instead.`, 'error');
       return false;
@@ -768,13 +846,13 @@ const GameAPI = {
 
   upgradeTowers() {
     const config = getConfig();
-    
+
     // Check if towers are disabled by mission
     if (config.DISABLE_TOWERS) {
       this.log('upgrade: tower upgrades disabled for this mission', 'error');
       return false;
     }
-    
+
     if (gameState.towers.length === 0) {
       this.log(`upgrade: no towers to upgrade`, 'error');
       return false;
@@ -801,13 +879,13 @@ const GameAPI = {
 
   syncRam() {
     const config = getConfig();
-    
+
     // Check if sync is disabled by mission
     if (config.DISABLE_SYNC) {
       this.log('sync: command disabled for this mission', 'error');
       return false;
     }
-    
+
     if (gameState.cooldowns.sync > 0) {
       const remaining = gameState.cooldowns.sync.toFixed(1);
       this.log(`sync: busy (${remaining}s remaining)`, 'error');
@@ -817,12 +895,72 @@ const GameAPI = {
     const syncCooldown = config.SYNC_COOLDOWN || CONFIG.SYNC_COOLDOWN;
     const syncRestore = config.SYNC_RESTORE || CONFIG.SYNC_RESTORE;
     const maxRam = config.RAM_MAX || CONFIG.RAM_MAX;
-    
+
     gameState.cooldowns.sync = syncCooldown;
     const restored = Math.min(syncRestore, maxRam - gameState.ram);
     gameState.ram = Math.min(maxRam, gameState.ram + syncRestore);
 
     this.log(`sync: flushing caches... +${restored} MB restored`, 'success');
+    return true;
+  },
+
+  killAll(freeUse = false) {
+    const config = getConfig();
+    const ramCost = CONFIG.KILLALL_RAM_COST;
+    const cooldown = CONFIG.KILLALL_COOLDOWN;
+
+    // Check cooldown
+    if (gameState.cooldowns.killall > 0) {
+      const remaining = gameState.cooldowns.killall.toFixed(1);
+      this.log(`killall: system recharging (${remaining}s remaining)`, 'error');
+      return false;
+    }
+
+    // Check if any enemies exist
+    if (gameState.minions.length === 0) {
+      this.log('killall: no active processes to terminate', 'warning');
+      return false;
+    }
+
+    // Check RAM (unless free use from tutorial)
+    if (!freeUse && gameState.ram < ramCost) {
+      this.log(`killall: insufficient RAM (need ${ramCost} MB, have ${Math.floor(gameState.ram)} MB)`, 'error');
+      return false;
+    }
+
+    // Deduct RAM and start cooldown
+    if (!freeUse) {
+      gameState.ram -= ramCost;
+    }
+    gameState.cooldowns.killall = cooldown;
+
+    // Kill all enemies with dramatic effect
+    const killCount = gameState.minions.length;
+    let totalReward = 0;
+
+    // Process each minion
+    for (const minion of [...gameState.minions]) {
+      const baseStats = CONFIG.MINIONS[minion.type];
+      const moneyScale = 1 + gameState.waveIndex * CONFIG.MONEY_SCALE_PER_WAVE;
+      const config = getConfig();
+      const moneyMult = config.MONEY_BONUS_MULTIPLIER || 1;
+
+      // Full reward as if killed by rm
+      let reward = Math.floor(baseStats.money * moneyScale * moneyMult * 1.5);
+      totalReward += reward;
+      gameState.money += reward;
+      gameState.metrics.kills++;
+
+      // Spawn death particles for each enemy
+      spawnDeathParticles(minion.x, minion.y, baseStats.color);
+    }
+
+    // Clear all minions
+    gameState.minions = [];
+
+    this.log(`killall: TERMINATED ${killCount} processes (+$${totalReward})`, 'kill');
+    this.log(`killall: system recharging... ${cooldown}s cooldown`, 'warning');
+
     return true;
   },
 
@@ -888,13 +1026,13 @@ const GameAPI = {
       const mission = campaignState.activeMission;
       this.log(`Mission ${mission.id}: ${mission.title}`, 'system');
       this.log(`Objective: Survive ${mission.waveCount} waves`, 'info');
-      
+
       // Show modifier warnings if any
       const modifiers = mission.modifiers || {};
       if (modifiers.disableSync) this.log('WARNING: sync command unavailable', 'warning');
       if (modifiers.disableForceRm) this.log('WARNING: rm -f unavailable', 'warning');
       if (modifiers.disableTowers) this.log('WARNING: tower construction disabled', 'warning');
-      
+
       this.log(`Wave ${gameState.waveIndex}/${mission.waveCount} incoming in ${CONFIG.WAVE_COUNTDOWN_SEC}s...`, 'warning');
     } else {
       this.log(`Wave ${gameState.waveIndex} incoming in ${CONFIG.WAVE_COUNTDOWN_SEC}s...`, 'warning');
@@ -903,27 +1041,31 @@ const GameAPI = {
     updateHUDForMode();
   },
 
-  // Start a campaign mission
+  // Start a campaign mission (supports both normal campaign and Campaign+ mode)
   startCampaignMission(missionId) {
     if (!startMission(missionId)) {
       this.log('Failed to start mission', 'error');
       return false;
     }
-    
+
     gameState.gameMode = 'campaign';
-    
-    // Check if tutorial should be shown (first time in campaign, mission 1)
-    const shouldShowTutorial = missionId === 1 && 
-                               campaignState.activeMission.showTutorial && 
-                               !tutorial.globallyCompleted;
-    
-    if (shouldShowTutorial) {
-      tutorial.enabled = true;
-    } else {
+
+    // Campaign+ mode: disable tutorials entirely (player already proved they know the game)
+    // Normal campaign: tutorials enabled but will be blocked by globallyCompleted if already done
+    if (campaignState.activeCampaignMode === 'campaign_plus') {
       tutorial.enabled = false;
+    } else {
+      // In normal campaign, enable tutorials (globallyCompleted check handles the rest)
+      tutorial.enabled = !tutorial.globallyCompleted || tutorial.forceReplay;
     }
-    
+
     this.start();
+
+    // Log Campaign+ mode indicator
+    if (campaignState.activeCampaignMode === 'campaign_plus') {
+      this.log('>>> CAMPAIGN+ MODE ACTIVE <<<', 'warning');
+    }
+
     return true;
   },
 
@@ -933,10 +1075,10 @@ const GameAPI = {
     gameState.activeConfig = null;
     campaignState.activeMission = null;
     campaignState.currentMissionId = null;
-    
+
     // Tutorial in endless mode only if not completed
     tutorial.enabled = !tutorial.globallyCompleted;
-    
+
     this.start();
   },
 
@@ -964,7 +1106,8 @@ function resetGameState() {
   gameState.paused = false;
   gameState.gameOver = false;
 
-  gameState.speedMultiplier = 1;
+  // Preserve speed setting across missions - don't reset speedMultiplier
+  // Player can manually change it with "speed 1" if they want
 
   // Apply mission modifiers if in campaign mode
   if (gameState.gameMode === 'campaign' && campaignState.activeMission) {
@@ -995,7 +1138,7 @@ function resetGameState() {
   gameState.minionIdCounter = 0;
   gameState.towerCount = 0;
 
-  gameState.cooldowns = { rm: 0, rmForce: 0, sync: 0 };
+  gameState.cooldowns = { rm: 0, rmForce: 0, sync: 0, killall: 0 };
 
   gameState.hpMult = 1;
   gameState.dmgMult = 1;
@@ -1014,6 +1157,10 @@ function resetGameState() {
   };
 
   gameState.previewTargetIndex = null;
+
+  gameState.notifications = {
+    canAffordTower: false
+  };
 
   scrollback.innerHTML = '';
 }
@@ -1048,13 +1195,24 @@ function startWave() {
 function spawnMinion(type) {
   const waveDef = getWaveDefinition(gameState.waveIndex);
   const baseStats = CONFIG.MINIONS[type];
+  const config = getConfig();
+
+  // Campaign+ enemy multipliers (default to 1.0 if not set)
+  const enemyHpMult = config.ENEMY_HP_MULTIPLIER || 1.0;
+  const enemySpeedMult = config.ENEMY_SPEED_MULTIPLIER || 1.0;
+
+  // Calculate HP: base * wave scaling * Campaign+ multiplier
+  const finalHp = Math.floor(baseStats.hp * gameState.hpMult * enemyHpMult);
+
+  // Calculate speed: base * wave speed scale * Campaign+ multiplier
+  const finalSpeed = baseStats.speed * waveDef.speedScale * enemySpeedMult;
 
   const minion = {
     id: ++gameState.minionIdCounter,
     type: type,
-    hp: Math.floor(baseStats.hp * gameState.hpMult),
-    maxHp: Math.floor(baseStats.hp * gameState.hpMult),
-    speed: baseStats.speed * waveDef.speedScale,
+    hp: finalHp,
+    maxHp: finalHp,
+    speed: finalSpeed,
     x: CONFIG.SPAWN_X,
     y: 150 + (Math.random() - 0.5) * 100,
     lastDamageSource: 'tower'
@@ -1091,12 +1249,12 @@ function killMinion(minion, source) {
 // Spawn shatter particles when enemy dies (Tron-style glass breaking)
 function spawnDeathParticles(x, y, color) {
   const particleCount = 12 + Math.floor(Math.random() * 8);  // 12-20 particles
-  
+
   for (let i = 0; i < particleCount; i++) {
     // Random angle for explosion direction
     const angle = (Math.PI * 2 * i / particleCount) + (Math.random() - 0.5) * 0.5;
     const speed = 80 + Math.random() * 120;  // 80-200 px/s
-    
+
     // Create particle with velocity and lifetime
     gameState.particles.push({
       x: x + (Math.random() - 0.5) * 20,  // Slight random offset
@@ -1126,7 +1284,7 @@ function checkWaveComplete() {
 
     const config = getConfig();
     const bonus = CONFIG.WAVE_CLEAR_BONUS_BASE + gameState.waveIndex * CONFIG.WAVE_CLEAR_BONUS_PER_WAVE;
-    
+
     // Apply money bonus multiplier if present (from mission modifiers)
     const finalBonus = config.MONEY_BONUS_MULTIPLIER
       ? Math.floor(bonus * config.MONEY_BONUS_MULTIPLIER)
@@ -1163,7 +1321,8 @@ function campaignVictory() {
   gameState.running = false;
   gameState.gameOver = true;
 
-  completeMission();
+  // completeMission returns true if Campaign+ was just unlocked (Mission 20 in normal campaign)
+  const justUnlockedCampaignPlus = completeMission();
 
   hudElements.gameStatus.textContent = '[ MISSION COMPLETE ]';
   hudElements.gameStatus.style.color = '#00ff88';
@@ -1171,7 +1330,13 @@ function campaignVictory() {
   GameAPI.log('=== MISSION COMPLETE ===', 'system');
 
   const stats = calculateFinalStats();
-  showCampaignVictoryScreen(stats);
+
+  // Show special Campaign Complete overlay if Campaign+ was just unlocked
+  if (justUnlockedCampaignPlus) {
+    showCampaignCompleteScreen(stats);
+  } else {
+    showCampaignVictoryScreen(stats);
+  }
 }
 
 function gameOver() {
@@ -1256,7 +1421,7 @@ function updateSpawning(dt) {
 function updateMinions(dt) {
   const config = getConfig();
   const coreDmgMult = config.CORE_DAMAGE_MULTIPLIER || 1;
-  
+
   for (const minion of gameState.minions) {
     minion.x -= minion.speed * dt;
 
@@ -1336,24 +1501,24 @@ function updateProjectiles(dt) {
 function updateParticles(dt) {
   for (let i = gameState.particles.length - 1; i >= 0; i--) {
     const p = gameState.particles[i];
-    
+
     // Update position
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    
+
     // Apply drag/friction
     p.vx *= 0.98;
     p.vy *= 0.98;
-    
+
     // Apply slight gravity
     p.vy += 30 * dt;
-    
+
     // Update rotation
     p.rotation += p.rotationSpeed * dt;
-    
+
     // Decay life
     p.life -= p.decay * dt;
-    
+
     // Remove dead particles
     if (p.life <= 0) {
       gameState.particles.splice(i, 1);
@@ -1510,16 +1675,16 @@ function drawParticles() {
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rotation);
-    
+
     // Set alpha based on remaining life
     ctx.globalAlpha = Math.max(0, p.life);
-    
+
     // Glow effect
     ctx.shadowColor = p.color;
     ctx.shadowBlur = 8 * p.life;
-    
+
     ctx.fillStyle = p.color;
-    
+
     if (p.shape === 'shard') {
       // Draw triangular shard
       ctx.beginPath();
@@ -1533,10 +1698,10 @@ function drawParticles() {
       const halfSize = p.size / 2;
       ctx.fillRect(-halfSize, -halfSize, p.size, p.size);
     }
-    
+
     ctx.restore();
   }
-  
+
   // Reset shadow
   ctx.shadowBlur = 0;
 }
@@ -1554,14 +1719,14 @@ function drawMinion(minion, index) {
   if (isTargeted) {
     // Pulsing effect
     const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 100);
-    
+
     // Outer glow
     ctx.shadowColor = '#ff0000';
     ctx.shadowBlur = 20 + pulse * 10;
     ctx.strokeStyle = `rgba(255, 50, 50, ${0.6 + pulse * 0.4})`;
     ctx.lineWidth = 4;
     ctx.strokeRect(x - 22, y - 19, 44, 38);
-    
+
     // Target brackets
     ctx.fillStyle = '#ff3333';
     ctx.shadowBlur = 15;
@@ -1577,7 +1742,7 @@ function drawMinion(minion, index) {
     // Bottom-right bracket
     ctx.fillRect(x + 14, y + 18, 10, 3);
     ctx.fillRect(x + 21, y + 11, 3, 10);
-    
+
     ctx.shadowBlur = 0;
   }
 
@@ -1683,7 +1848,10 @@ function updateHUDForMode() {
   if (gameState.gameMode === 'campaign' && campaignState.activeMission) {
     // Show mission info
     if (hudMission) hudMission.classList.remove('hidden');
-    if (missionTitle) missionTitle.textContent = campaignState.activeMission.title;
+
+    // Add Campaign+ indicator to mission title if in that mode
+    const modeIndicator = campaignState.activeCampaignMode === 'campaign_plus' ? ' [+]' : '';
+    if (missionTitle) missionTitle.textContent = campaignState.activeMission.title + modeIndicator;
   } else {
     // Endless mode - hide mission
     if (hudMission) hudMission.classList.add('hidden');
@@ -1721,16 +1889,24 @@ function updateHUD() {
 
   // Credits display with can-afford indicator
   hudElements.moneyValue.textContent = '$' + gameState.money;
-  
+
   // Check if player can afford a tower (and towers aren't disabled)
   const towerCost = GameAPI.getTowerCost();
   const canAffordTower = towerCost !== null && gameState.money >= towerCost;
   const creditsContainer = hudElements.moneyValue.parentElement;
-  
+
   if (canAffordTower && gameState.running && !gameState.gameOver && gameState.towerCount < CONFIG.TOWER_MAX) {
     creditsContainer.classList.add('can-afford');
+
+    // One-time notification when first becoming affordable
+    if (!gameState.notifications.canAffordTower) {
+      gameState.notifications.canAffordTower = true;
+      GameAPI.log(`CREDITS: Cannon available! (build cannon - $${towerCost})`, 'system');
+    }
   } else {
     creditsContainer.classList.remove('can-afford');
+    // Reset notification flag when no longer affordable (or tower built)
+    gameState.notifications.canAffordTower = false;
   }
 
   const metrics = gameState.metrics;
@@ -1761,6 +1937,7 @@ function updateHUD() {
   updateCooldownIndicator(hudElements.cdRm, gameState.cooldowns.rm);
   updateCooldownIndicator(hudElements.cdRmF, gameState.cooldowns.rmForce);
   updateCooldownIndicator(hudElements.cdSync, gameState.cooldowns.sync);
+  updateCooldownIndicator(hudElements.cdKillall, gameState.cooldowns.killall);
 
   if (hudElements.speedValue) {
     if (gameState.paused && !tutorial.paused) {
@@ -1798,10 +1975,10 @@ const commandHistory = {
 // Update target preview based on current input
 function updateTargetPreview() {
   const input = cmdInput.value.trim().toLowerCase();
-  
+
   // Match "rm <index>" or "rm -f <index>" or "rm -rf <index>"
   const rmMatch = input.match(/^rm\s+(?:-r?f\s+)?(\d+)$/);
-  
+
   if (rmMatch) {
     const index = parseInt(rmMatch[1], 10);
     gameState.previewTargetIndex = index;
@@ -1815,14 +1992,14 @@ function setupInputHandling() {
     // Handle up arrow - go back in history
     if (e.key === 'ArrowUp') {
       e.preventDefault();  // Prevent cursor from moving to start of input
-      
+
       if (commandHistory.entries.length === 0) return;
-      
+
       // If we're at the current input (not in history), save it
       if (commandHistory.index === -1) {
         commandHistory.tempInput = cmdInput.value;
       }
-      
+
       // Move back in history
       if (commandHistory.index < commandHistory.entries.length - 1) {
         commandHistory.index++;
@@ -1831,15 +2008,15 @@ function setupInputHandling() {
       }
       return;
     }
-    
+
     // Handle down arrow - go forward in history
     if (e.key === 'ArrowDown') {
       e.preventDefault();  // Prevent cursor from moving to end of input
-      
+
       if (commandHistory.index === -1) return;  // Already at current input
-      
+
       commandHistory.index--;
-      
+
       if (commandHistory.index === -1) {
         // Back to current input
         cmdInput.value = commandHistory.tempInput;
@@ -1849,7 +2026,7 @@ function setupInputHandling() {
       updateTargetPreview();
       return;
     }
-    
+
     if (e.key === 'Enter') {
       const input = cmdInput.value.trim();
 
@@ -1862,16 +2039,16 @@ function setupInputHandling() {
 
       if (input) {
         // Add to command history (avoid duplicating consecutive commands)
-        if (commandHistory.entries.length === 0 || 
+        if (commandHistory.entries.length === 0 ||
             commandHistory.entries[commandHistory.entries.length - 1] !== input) {
           commandHistory.entries.push(input);
-          
+
           // Trim history if it exceeds max size
           if (commandHistory.entries.length > commandHistory.maxSize) {
             commandHistory.entries.shift();
           }
         }
-        
+
         // Reset history navigation state
         commandHistory.index = -1;
         commandHistory.tempInput = '';
@@ -1955,12 +2132,12 @@ function renderLoop(timestamp) {
   // Calculate delta time for smooth particle animation (independent of game tick)
   const dt = lastRenderTime ? (timestamp - lastRenderTime) / 1000 : 0.016;
   lastRenderTime = timestamp;
-  
+
   // Update particles even during pause (visual effect only)
   if (dt > 0 && dt < 0.1) {  // Sanity check
     updateParticles(dt * gameState.speedMultiplier);
   }
-  
+
   drawCanvas();
   updateHUD();
   requestAnimationFrame(renderLoop);
@@ -1973,6 +2150,7 @@ function renderLoop(timestamp) {
 function showCampaignVictoryScreen(stats) {
   const overlay = document.getElementById('campaignVictoryOverlay');
   const currentMissionId = campaignState.activeMission.id;
+  const isCampaignPlusMode = campaignState.activeCampaignMode === 'campaign_plus';
 
   document.getElementById('victoryMission').textContent = currentMissionId;
   document.getElementById('victoryWaves').textContent = stats.waves;
@@ -1981,20 +2159,48 @@ function showCampaignVictoryScreen(stats) {
   document.getElementById('victoryTime').textContent = formatTime(stats.time);
   document.getElementById('victoryKills').textContent = stats.kills;
 
+  // Update subtitle based on mode
+  const subtitle = document.getElementById('victorySubtitle');
+  if (isCampaignPlusMode) {
+    subtitle.textContent = 'Campaign+ mission complete. Enhanced difficulty conquered.';
+  } else {
+    subtitle.textContent = 'Neural link stable. Hostiles neutralized.';
+  }
+
   // Set up next mission button
   const nextBtn = document.getElementById('btnNextMission');
   const nextMissionId = currentMissionId + 1;
-  
-  if (nextMissionId <= MISSIONS.length) {
+
+  if (nextMissionId <= MISSIONS.length && isMissionUnlocked(nextMissionId)) {
     nextBtn.style.display = '';
     nextBtn.dataset.missionId = nextMissionId;
     nextBtn.textContent = 'NEXT MISSION';
+  } else if (nextMissionId > MISSIONS.length) {
+    // All missions complete in this mode
+    if (isCampaignPlusMode) {
+      nextBtn.style.display = '';
+      nextBtn.textContent = 'CAMPAIGN+ COMPLETE!';
+      nextBtn.dataset.missionId = '';
+    } else {
+      // This shouldn't normally happen since Mission 20 triggers the special screen
+      nextBtn.style.display = '';
+      nextBtn.textContent = 'CAMPAIGN COMPLETE!';
+      nextBtn.dataset.missionId = '';
+    }
   } else {
-    // Campaign complete!
-    nextBtn.style.display = '';
-    nextBtn.textContent = 'CAMPAIGN COMPLETE';
-    nextBtn.dataset.missionId = '';
+    nextBtn.style.display = 'none';
   }
+
+  overlay.classList.remove('hidden');
+}
+
+// Special screen shown when Campaign+ is unlocked (after completing Mission 20 in normal campaign)
+function showCampaignCompleteScreen(stats) {
+  const overlay = document.getElementById('campaignCompleteOverlay');
+
+  document.getElementById('completeBestWpm').textContent = stats.bestWpm;
+  document.getElementById('completeAccuracy').textContent = stats.accuracy + '%';
+  document.getElementById('completeTime').textContent = formatTime(stats.time);
 
   overlay.classList.remove('hidden');
 }
@@ -2014,10 +2220,25 @@ function showCampaignFailureScreen(stats) {
 
 function showTitleScreen() {
   // Update campaign progress display
-  const progress = getCampaignProgress();
-  document.getElementById('campaignProgress').textContent = 
+  const progress = getCampaignProgress('campaign');
+  document.getElementById('campaignProgress').textContent =
     `Mission ${progress.highestUnlocked} / ${progress.total}`;
-  
+
+  // Update Campaign+ button state
+  const campaignPlusBtn = document.getElementById('btnCampaignPlus');
+  const campaignPlusProgress = document.getElementById('campaignPlusProgress');
+
+  if (isCampaignPlusUnlocked()) {
+    campaignPlusBtn.classList.remove('locked');
+    campaignPlusBtn.querySelector('.mode-icon').textContent = '▶+';
+    const plusProgress = getCampaignProgress('campaign_plus');
+    campaignPlusProgress.textContent = `Mission ${plusProgress.highestUnlocked} / ${plusProgress.total}`;
+  } else {
+    campaignPlusBtn.classList.add('locked');
+    campaignPlusBtn.querySelector('.mode-icon').textContent = '🔒';
+    campaignPlusProgress.textContent = 'Complete Campaign to unlock';
+  }
+
   document.getElementById('titleOverlay').classList.remove('hidden');
 }
 
@@ -2025,38 +2246,88 @@ function hideTitleScreen() {
   document.getElementById('titleOverlay').classList.add('hidden');
 }
 
-function showMissionSelect() {
+function showMissionSelect(mode = null) {
+  // Set active mode if provided, otherwise use current
+  if (mode) {
+    setActiveCampaignMode(mode);
+  }
+
+  const activeMode = getActiveCampaignMode();
+  const isCampaignPlus = activeMode === 'campaign_plus';
+
   const grid = document.getElementById('missionGrid');
-  const progress = getCampaignProgress();
-  
-  document.getElementById('missionSelectProgress').textContent = 
+  const title = document.getElementById('missionSelectTitle');
+  const progress = getCampaignProgress(activeMode);
+
+  // Update title based on mode
+  if (isCampaignPlus) {
+    title.textContent = 'CAMPAIGN+ MISSIONS';
+    title.classList.add('campaign-plus');
+    grid.classList.add('campaign-plus-mode');
+  } else {
+    title.textContent = 'CAMPAIGN MISSIONS';
+    title.classList.remove('campaign-plus');
+    grid.classList.remove('campaign-plus-mode');
+  }
+
+  document.getElementById('missionSelectProgress').textContent =
     `Progress: ${progress.completed} / ${progress.total}`;
-  
+
+  // Update mode tabs
+  updateModeTabsState();
+
   // Generate mission buttons
   grid.innerHTML = '';
   MISSIONS.forEach(mission => {
     const btn = document.createElement('button');
     btn.className = 'mission-btn';
-    
-    const isUnlocked = isMissionUnlocked(mission.id);
-    const isCompleted = isMissionCompleted(mission.id);
-    
+
+    const isUnlocked = isMissionUnlocked(mission.id, activeMode);
+    const isCompleted = isMissionCompleted(mission.id, activeMode);
+
+    // Also check if completed in the other mode (for visual reference)
+    const isCompletedInOtherMode = isCampaignPlus
+      ? isMissionCompleted(mission.id, 'campaign')
+      : isMissionCompleted(mission.id, 'campaign_plus');
+
     if (!isUnlocked) btn.classList.add('locked');
-    if (isCompleted) btn.classList.add('completed');
-    
+    if (isCompleted) {
+      btn.classList.add(isCampaignPlus ? 'completed-plus' : 'completed');
+    }
+
     btn.innerHTML = `
       <span class="mission-btn-num">${mission.id}</span>
       <span class="mission-btn-title">${mission.title}</span>
     `;
-    
+
     if (isUnlocked) {
       btn.addEventListener('click', () => showMissionBriefing(mission.id));
     }
-    
+
     grid.appendChild(btn);
   });
-  
+
   document.getElementById('missionSelectOverlay').classList.remove('hidden');
+}
+
+// Update mode tabs visual state
+function updateModeTabsState() {
+  const activeMode = getActiveCampaignMode();
+  const tabCampaign = document.getElementById('tabCampaign');
+  const tabCampaignPlus = document.getElementById('tabCampaignPlus');
+
+  // Update active state
+  tabCampaign.classList.toggle('active', activeMode === 'campaign');
+  tabCampaignPlus.classList.toggle('active', activeMode === 'campaign_plus');
+
+  // Update locked state for Campaign+ tab
+  if (isCampaignPlusUnlocked()) {
+    tabCampaignPlus.classList.remove('locked');
+    tabCampaignPlus.disabled = false;
+  } else {
+    tabCampaignPlus.classList.add('locked');
+    tabCampaignPlus.disabled = true;
+  }
 }
 
 function hideMissionSelect() {
@@ -2066,23 +2337,48 @@ function hideMissionSelect() {
 function showMissionBriefing(missionId) {
   const mission = getMission(missionId);
   if (!mission) return;
-  
-  document.getElementById('briefingMissionNum').textContent = `MISSION ${mission.id}`;
+
+  const isCampaignPlusMode = getActiveCampaignMode() === 'campaign_plus';
+
+  // Update mission number text to show mode
+  const missionNumText = isCampaignPlusMode ? `MISSION ${mission.id} (CAMPAIGN+)` : `MISSION ${mission.id}`;
+  document.getElementById('briefingMissionNum').textContent = missionNumText;
   document.getElementById('briefingTitle').textContent = mission.title;
   document.getElementById('briefingDescription').textContent = mission.description;
   document.getElementById('briefingWaves').textContent = mission.waveCount;
-  
-  // Calculate difficulty
+
+  // Calculate difficulty (Campaign+ is always one tier harder)
   let difficulty = 'EASY';
   if (mission.id >= 16) difficulty = 'HARD';
   else if (mission.id >= 10) difficulty = 'MEDIUM';
   else if (mission.id >= 7) difficulty = 'NORMAL';
+
+  if (isCampaignPlusMode) {
+    // Bump difficulty label for Campaign+ mode
+    if (difficulty === 'EASY') difficulty = 'NORMAL';
+    else if (difficulty === 'NORMAL') difficulty = 'MEDIUM';
+    else if (difficulty === 'MEDIUM') difficulty = 'HARD';
+    else difficulty = 'EXTREME';
+  }
   document.getElementById('briefingDifficulty').textContent = difficulty;
-  
+
   // Show modifiers
   const modifiersContainer = document.getElementById('briefingModifiers');
   modifiersContainer.innerHTML = '';
-  
+
+  // Campaign+ global modifiers (shown first if in Campaign+ mode)
+  if (isCampaignPlusMode) {
+    addModifierTag(modifiersContainer, 'Campaign+ active', false, true);  // Special highlight
+    addModifierTag(modifiersContainer, '+25% enemy HP', true);
+    addModifierTag(modifiersContainer, '+20% enemy speed', true);
+    addModifierTag(modifiersContainer, '+15% core damage', true);
+    addModifierTag(modifiersContainer, '-15% sync restore', true);
+    addModifierTag(modifiersContainer, '+20% sync cooldown', true);
+    addModifierTag(modifiersContainer, '+15% rm cooldowns', true);
+    addModifierTag(modifiersContainer, '+15% tower costs', true);
+  }
+
+  // Mission-specific modifiers
   const modifiers = mission.modifiers || {};
   if (modifiers.disableSync) {
     addModifierTag(modifiersContainer, 'sync disabled', true);
@@ -2105,10 +2401,10 @@ function showMissionBriefing(missionId) {
   if (modifiers.coreHpMultiplier && modifiers.coreHpMultiplier < 1) {
     addModifierTag(modifiersContainer, 'fragile core', true);
   }
-  
+
   // Store selected mission for start button
   document.getElementById('btnStartMission').dataset.missionId = missionId;
-  
+
   // Show next mission button only if there is a next mission
   const nextBtn = document.getElementById('btnNextMission');
   const nextMissionId = missionId + 1;
@@ -2122,7 +2418,7 @@ function showMissionBriefing(missionId) {
     // No next mission (completed campaign)
     nextBtn.style.display = 'none';
   }
-  
+
   hideMissionSelect();
   document.getElementById('missionBriefingOverlay').classList.remove('hidden');
 }
@@ -2131,9 +2427,13 @@ function hideMissionBriefing() {
   document.getElementById('missionBriefingOverlay').classList.add('hidden');
 }
 
-function addModifierTag(container, text, isNegative) {
+function addModifierTag(container, text, isNegative, isCampaignPlusIndicator = false) {
   const tag = document.createElement('span');
-  tag.className = 'modifier-tag' + (isNegative ? ' negative' : '');
+  if (isCampaignPlusIndicator) {
+    tag.className = 'modifier-tag campaign-plus-active';
+  } else {
+    tag.className = 'modifier-tag' + (isNegative ? ' negative' : '');
+  }
   tag.textContent = text;
   container.appendChild(tag);
 }
@@ -2146,6 +2446,7 @@ function hideAllOverlays() {
   document.getElementById('leaderboardOverlay').classList.add('hidden');
   document.getElementById('campaignVictoryOverlay').classList.add('hidden');
   document.getElementById('campaignFailureOverlay').classList.add('hidden');
+  document.getElementById('campaignCompleteOverlay').classList.add('hidden');
 }
 
 // ===========================================
@@ -2236,8 +2537,20 @@ function setupOverlayButtons() {
 function setupTitleScreenButtons() {
   // Campaign button
   document.getElementById('btnCampaign').addEventListener('click', () => {
+    setActiveCampaignMode('campaign');
     hideTitleScreen();
-    showMissionSelect();
+    showMissionSelect('campaign');
+  });
+
+  // Campaign+ button
+  document.getElementById('btnCampaignPlus').addEventListener('click', () => {
+    if (!isCampaignPlusUnlocked()) {
+      // Show message that it's locked
+      return;
+    }
+    setActiveCampaignMode('campaign_plus');
+    hideTitleScreen();
+    showMissionSelect('campaign_plus');
   });
 
   // Endless button
@@ -2257,8 +2570,9 @@ function setupTitleScreenButtons() {
   // Replay tutorial
   document.getElementById('btnTutorialReplay').addEventListener('click', () => {
     tutorial.enableReplay();
+    setActiveCampaignMode('campaign');
     hideTitleScreen();
-    
+
     // Start mission 1 to replay tutorial
     GameAPI.startCampaignMission(1);
     cmdInput.focus();
@@ -2270,6 +2584,20 @@ function setupCampaignButtons() {
   document.getElementById('btnMissionSelectBack').addEventListener('click', () => {
     hideMissionSelect();
     showTitleScreen();
+  });
+
+  // Mode tabs in mission select
+  document.getElementById('tabCampaign').addEventListener('click', () => {
+    if (getActiveCampaignMode() !== 'campaign') {
+      showMissionSelect('campaign');
+    }
+  });
+
+  document.getElementById('tabCampaignPlus').addEventListener('click', () => {
+    if (!isCampaignPlusUnlocked()) return;
+    if (getActiveCampaignMode() !== 'campaign_plus') {
+      showMissionSelect('campaign_plus');
+    }
   });
 
   // Mission briefing back button
@@ -2299,7 +2627,7 @@ function setupCampaignButtons() {
     const nextMissionId = parseInt(e.target.dataset.missionId);
     document.getElementById('campaignVictoryOverlay').classList.add('hidden');
     gameState.gameOver = false;
-    
+
     if (nextMissionId && isMissionUnlocked(nextMissionId)) {
       showMissionBriefing(nextMissionId);
     } else {
@@ -2317,12 +2645,26 @@ function setupCampaignButtons() {
   document.getElementById('btnRetryMission').addEventListener('click', () => {
     document.getElementById('campaignFailureOverlay').classList.add('hidden');
     gameState.gameOver = false;
-    
+
     const missionId = campaignState.currentMissionId;
     if (missionId) {
       GameAPI.startCampaignMission(missionId);
       cmdInput.focus();
     }
+  });
+
+  // Campaign Complete overlay buttons (shown when Campaign+ is unlocked)
+  document.getElementById('btnCompleteMenu').addEventListener('click', () => {
+    document.getElementById('campaignCompleteOverlay').classList.add('hidden');
+    gameState.gameOver = false;
+    showTitleScreen();
+  });
+
+  document.getElementById('btnStartCampaignPlus').addEventListener('click', () => {
+    document.getElementById('campaignCompleteOverlay').classList.add('hidden');
+    gameState.gameOver = false;
+    setActiveCampaignMode('campaign_plus');
+    showMissionSelect('campaign_plus');
   });
 }
 

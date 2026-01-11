@@ -374,24 +374,33 @@ body {
 
 /* Visual indicator: Can afford to build tower */
 .hud-stat.can-afford {
-  animation: canAffordPulse 1.5s ease-in-out infinite;
+  animation: canAffordPulse 1.2s ease-in-out infinite;
+  background: rgba(0, 255, 136, 0.15);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.4), inset 0 0 8px rgba(0, 255, 136, 0.1);
 }
 
 .hud-stat.can-afford .hud-value {
   color: var(--neon-green);
   text-shadow: 0 0 8px var(--neon-green), 0 0 16px var(--neon-green);
+  font-weight: bold;
 }
 
 .hud-stat.can-afford .hud-label {
   color: var(--neon-green);
+  text-shadow: 0 0 4px var(--neon-green);
 }
 
 @keyframes canAffordPulse {
   0%, 100% {
     transform: scale(1);
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.4), inset 0 0 8px rgba(0, 255, 136, 0.1);
   }
   50% {
-    transform: scale(1.05);
+    transform: scale(1.12);
+    box-shadow: 0 0 16px rgba(0, 255, 136, 0.6), inset 0 0 12px rgba(0, 255, 136, 0.2);
   }
 }
 
@@ -762,6 +771,48 @@ body {
   transform: translateX(4px);
 }
 
+/* Campaign+ Button */
+.btn-campaign-plus {
+  background: rgba(255, 102, 0, 0.1);
+  border: 2px solid var(--neon-orange);
+  color: var(--neon-orange);
+}
+
+.btn-campaign-plus:hover:not(.locked) {
+  background: rgba(255, 102, 0, 0.2);
+  box-shadow: 0 0 30px rgba(255, 102, 0, 0.4);
+  transform: translateX(4px);
+}
+
+.btn-campaign-plus.locked {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--text-dim);
+  color: var(--text-dim);
+  background: rgba(100, 100, 100, 0.1);
+}
+
+.btn-campaign-plus.locked:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-campaign-plus.locked .mode-icon {
+  filter: grayscale(1);
+}
+
+/* Campaign+ Start Button (in unlock overlay) */
+.btn-campaign-plus-start {
+  background: rgba(255, 102, 0, 0.2) !important;
+  border-color: var(--neon-orange) !important;
+  color: var(--neon-orange) !important;
+}
+
+.btn-campaign-plus-start:hover {
+  background: rgba(255, 102, 0, 0.3) !important;
+  box-shadow: 0 0 20px rgba(255, 102, 0, 0.5) !important;
+}
+
 .mode-icon {
   font-size: 28px;
   width: 40px;
@@ -803,6 +854,63 @@ body {
 .mission-select-title {
   color: var(--neon-green);
   text-shadow: 0 0 20px var(--neon-green);
+}
+
+.mission-select-title.campaign-plus {
+  color: var(--neon-orange);
+  text-shadow: 0 0 20px var(--neon-orange);
+}
+
+/* Mode Tabs (Campaign / Campaign+) */
+.mode-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin: 16px 0;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.mode-tab {
+  padding: 10px 24px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-tab:hover:not(.active):not(.locked) {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.mode-tab.active {
+  background: rgba(0, 255, 136, 0.15);
+  border-color: var(--neon-green);
+  color: var(--neon-green);
+}
+
+.mode-tab.active[data-mode="campaign_plus"] {
+  background: rgba(255, 102, 0, 0.15);
+  border-color: var(--neon-orange);
+  color: var(--neon-orange);
+}
+
+.mode-tab.locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mode-tab.locked::after {
+  content: ' 🔒';
+  font-size: 10px;
 }
 
 .mission-grid {
@@ -969,12 +1077,98 @@ body {
   color: var(--neon-red);
 }
 
+/* Campaign+ active tag (special highlight) */
+.modifier-tag.campaign-plus-active {
+  background: rgba(255, 102, 0, 0.2);
+  border-color: var(--neon-orange);
+  color: var(--neon-orange);
+  font-weight: bold;
+}
+
 /* ===========================================
    Victory Screen
    =========================================== */
 .victory-title {
   color: var(--neon-green) !important;
   text-shadow: 0 0 20px var(--neon-green) !important;
+}
+
+/* ===========================================
+   Campaign Complete + Campaign+ Unlock Screen
+   =========================================== */
+.campaign-complete-title {
+  color: var(--neon-amber) !important;
+  text-shadow: 0 0 20px var(--neon-amber), 0 0 40px var(--neon-amber) !important;
+  animation: campaignCompletePulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes campaignCompletePulse {
+  from {
+    text-shadow: 0 0 20px var(--neon-amber), 0 0 40px var(--neon-amber);
+  }
+  to {
+    text-shadow: 0 0 30px var(--neon-amber), 0 0 60px var(--neon-amber), 0 0 80px rgba(255, 204, 0, 0.5);
+  }
+}
+
+.campaign-complete-subtitle {
+  margin-bottom: 16px;
+}
+
+.unlock-text {
+  display: inline-block;
+  font-size: 18px;
+  color: var(--neon-orange);
+  text-shadow: 0 0 15px var(--neon-orange);
+  letter-spacing: 2px;
+  animation: unlockPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes unlockPulse {
+  from {
+    transform: scale(1);
+    text-shadow: 0 0 15px var(--neon-orange);
+  }
+  to {
+    transform: scale(1.05);
+    text-shadow: 0 0 25px var(--neon-orange), 0 0 40px rgba(255, 102, 0, 0.6);
+  }
+}
+
+.campaign-complete-desc {
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.8;
+  margin-bottom: 20px;
+}
+
+/* ===========================================
+   Campaign+ Mission Badges
+   =========================================== */
+/* Campaign+ completed missions have magenta/orange checkmark */
+.mission-btn.completed-plus {
+  border-color: var(--neon-orange);
+  background: rgba(255, 102, 0, 0.1);
+}
+
+.mission-btn.completed-plus::after {
+  content: '✓+';
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 10px;
+  color: var(--neon-orange);
+  font-weight: bold;
+}
+
+/* Mission button in Campaign+ mode */
+.mission-grid.campaign-plus-mode .mission-btn-num {
+  color: var(--neon-orange);
+}
+
+.mission-grid.campaign-plus-mode .mission-btn:hover:not(.locked):not(:disabled) {
+  background: rgba(255, 102, 0, 0.1);
+  border-color: var(--neon-orange);
 }
 
 /* ===========================================

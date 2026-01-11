@@ -96,6 +96,7 @@
           <span class="cooldown-item" id="cdRm" title="rm cooldown">rm</span>
           <span class="cooldown-item" id="cdRmF" title="rm -f cooldown">rm -f</span>
           <span class="cooldown-item" id="cdSync" title="sync cooldown">sync</span>
+          <span class="cooldown-item" id="cdKillall" title="killall cooldown">killall</span>
         </div>
       </div>
 
@@ -195,6 +196,12 @@
           <span class="mode-desc" id="campaignProgress">Mission 1 / 20</span>
         </button>
 
+        <button class="btn btn-mode btn-campaign-plus locked" id="btnCampaignPlus">
+          <span class="mode-icon">🔒</span>
+          <span class="mode-name">CAMPAIGN+</span>
+          <span class="mode-desc" id="campaignPlusProgress">Complete Campaign to unlock</span>
+        </button>
+
         <button class="btn btn-mode btn-endless" id="btnEndless">
           <span class="mode-icon">∞</span>
           <span class="mode-name">ENDLESS</span>
@@ -212,7 +219,14 @@
   <!-- Mission select overlay -->
   <div id="missionSelectOverlay" class="overlay hidden">
     <div class="overlay-content mission-select-content">
-      <h1 class="overlay-title mission-select-title">CAMPAIGN MISSIONS</h1>
+      <h1 class="overlay-title mission-select-title" id="missionSelectTitle">CAMPAIGN MISSIONS</h1>
+
+      <!-- Mode tabs for switching between Campaign and Campaign+ -->
+      <div class="mode-tabs" id="modeTabs">
+        <button class="mode-tab active" id="tabCampaign" data-mode="campaign">CAMPAIGN</button>
+        <button class="mode-tab" id="tabCampaignPlus" data-mode="campaign_plus">CAMPAIGN+</button>
+      </div>
+
       <div class="overlay-subtitle" id="missionSelectProgress">Progress: 0 / 20</div>
 
       <div class="mission-grid" id="missionGrid">
@@ -260,7 +274,7 @@
   <div id="campaignVictoryOverlay" class="overlay hidden">
     <div class="overlay-content">
       <h1 class="overlay-title victory-title">MISSION COMPLETE</h1>
-      <div class="overlay-subtitle">Neural link stable. Hostiles neutralized.</div>
+      <div class="overlay-subtitle" id="victorySubtitle">Neural link stable. Hostiles neutralized.</div>
 
       <div class="stats-grid" id="victoryStatsGrid">
         <div class="stat-item">
@@ -289,9 +303,43 @@
         </div>
       </div>
 
-      <div class="overlay-buttons">
+      <div class="overlay-buttons" id="victoryButtons">
         <button class="btn btn-secondary" id="btnVictoryMissions">MISSION SELECT</button>
         <button class="btn btn-primary" id="btnNextMission">NEXT MISSION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Campaign Complete + Campaign+ Unlocked overlay (shown after Mission 20 normal campaign) -->
+  <div id="campaignCompleteOverlay" class="overlay hidden">
+    <div class="overlay-content">
+      <h1 class="overlay-title campaign-complete-title">CAMPAIGN COMPLETE!</h1>
+      <div class="campaign-complete-subtitle">
+        <span class="unlock-text">🎉 CAMPAIGN+ UNLOCKED! 🎉</span>
+      </div>
+      <p class="campaign-complete-desc">
+        You've proven your skills, Operator. Now face the true challenge.<br>
+        Campaign+ features increased difficulty with global modifiers.
+      </p>
+
+      <div class="stats-grid" id="campaignCompleteStats">
+        <div class="stat-item">
+          <span class="stat-label">BEST WPM</span>
+          <span class="stat-value" id="completeBestWpm">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">ACCURACY</span>
+          <span class="stat-value" id="completeAccuracy">100%</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">TIME</span>
+          <span class="stat-value" id="completeTime">0:00</span>
+        </div>
+      </div>
+
+      <div class="overlay-buttons">
+        <button class="btn btn-secondary" id="btnCompleteMenu">MAIN MENU</button>
+        <button class="btn btn-primary btn-campaign-plus-start" id="btnStartCampaignPlus">START CAMPAIGN+</button>
       </div>
     </div>
   </div>

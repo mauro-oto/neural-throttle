@@ -15,6 +15,7 @@ const COMMAND_PATTERNS = {
   upgradeAlone: /^upgrade$/,
   upgradeInvalidArg: /^upgrade\s+(\S+)$/,
   sync: /^sync$/,
+  killall: /^killall$/,
   speedWithArgs: /^speed\s+(\d+)$/,
   speedAlone: /^speed$/,
   pause: /^pause$/,
@@ -34,6 +35,7 @@ const HELP_TEXT = {
     '  build cannon     - Build defense tower (max 6)',
     '  upgrade cannon   - Upgrade all towers (+40% dmg)',
     '  sync             - Restore +70 MB RAM (6s cd)',
+    '  killall          - Terminate ALL enemies (40 MB, 75s cd)',
     '  pause            - Pause the game',
     '  speed <0|1|2>    - Set speed (0=pause, 1=normal, 2=fast)',
     '  status           - Show current status',
@@ -102,6 +104,21 @@ const HELP_TEXT = {
     'Cooldown: 6 seconds',
     'Wave clears also restore +40 MB.',
   ],
+  killall: [
+    'killall - Emergency process termination',
+    '',
+    'Usage:',
+    '  killall         Terminate ALL enemy processes instantly',
+    '',
+    'Cost: 40 MB RAM',
+    'Cooldown: 75 seconds',
+    '',
+    'This is your PANIC BUTTON. Use it when overwhelmed.',
+    'The long cooldown means you can only use it once or',
+    'twice per mission - time it wisely!',
+    '',
+    'All enemies are killed and you receive full rewards.',
+  ],
   speed: [
     'speed - Change game speed',
     '',
@@ -169,7 +186,7 @@ function parseCommand(input) {
   }
 
   // Check other commands with args
-  const commandsWithArgs = ['buildWithArgs', 'upgradeWithArgs', 'speedWithArgs', 'pause', 'help', 'sync', 'clear', 'status'];
+  const commandsWithArgs = ['buildWithArgs', 'upgradeWithArgs', 'speedWithArgs', 'pause', 'help', 'sync', 'killall', 'clear', 'status'];
   const commandNames = {
     buildWithArgs: 'build',
     upgradeWithArgs: 'upgrade',
@@ -177,6 +194,7 @@ function parseCommand(input) {
     pause: 'pause',
     help: 'help',
     sync: 'sync',
+    killall: 'killall',
     clear: 'clear',
     status: 'status'
   };
@@ -235,6 +253,7 @@ function executeCommand(input) {
     upgradeMissingArgs: handleUpgradeMissingArgs,
     upgradeInvalidArg: handleUpgradeInvalidArg,
     sync: handleSync,
+    killall: handleKillall,
     speed: handleSpeed,
     speedMissingArgs: handleSpeedMissingArgs,
     pause: handlePause,
@@ -396,6 +415,25 @@ function handleSync(args) {
   return GameAPI.syncRam();
 }
 
+function handleKillall(args) {
+  // Check if game is running
+  if (!gameState.running) {
+    GameAPI.log('killall: no active session', 'error');
+    return false;
+  }
+
+  // Check if game is paused
+  if (gameState.paused && !tutorial.paused) {
+    GameAPI.log('killall: game is paused (use "speed 1" to resume)', 'error');
+    return false;
+  }
+
+  // Check if this is a tutorial free use
+  const freeUse = tutorial.paused && tutorial.currentStep === 'killallIntro';
+
+  return GameAPI.killAll(freeUse);
+}
+
 function handleSpeed(args) {
   const speedStr = args[0];
   const speed = parseInt(speedStr, 10);
@@ -439,6 +477,14 @@ function handleStatus(args) {
   const status = GameAPI.getStatus();
 
   GameAPI.log('--- SYSTEM STATUS ---', 'system');
+
+  // Show Campaign+ mode indicator if active
+  if (typeof campaignState !== 'undefined' &&
+      gameState.gameMode === 'campaign' &&
+      campaignState.activeCampaignMode === 'campaign_plus') {
+    GameAPI.log('Mode: CAMPAIGN+ (enhanced difficulty)', 'warning');
+  }
+
   GameAPI.log(`RAM: ${Math.floor(status.ram)}/${status.maxRam} MB`, 'info');
   GameAPI.log(`Core: ${Math.floor(status.coreHp)}/${status.maxCoreHp} HP`, 'info');
   GameAPI.log(`Wave: ${status.wave}`, 'info');
@@ -452,6 +498,7 @@ function handleStatus(args) {
   if (status.cooldowns.rm > 0) cds.push(`rm: ${status.cooldowns.rm.toFixed(1)}s`);
   if (status.cooldowns.rmForce > 0) cds.push(`rm -f: ${status.cooldowns.rmForce.toFixed(1)}s`);
   if (status.cooldowns.sync > 0) cds.push(`sync: ${status.cooldowns.sync.toFixed(1)}s`);
+  if (status.cooldowns.killall > 0) cds.push(`killall: ${status.cooldowns.killall.toFixed(1)}s`);
 
   if (cds.length > 0) {
     GameAPI.log(`Cooldowns: ${cds.join(', ')}`, 'warning');
