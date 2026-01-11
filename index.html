@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neural Throttle</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" class="terminal-app">
+    <!-- Title bar -->
+    <div class="title-bar">
+      <span class="title-text">NEURAL THROTTLE v1.0</span>
+      <span class="title-status" id="gameStatus">[ INITIALIZING ]</span>
+    </div>
+
+    <!-- Main content: two panes -->
+    <div class="main-content">
+      <!-- Left: Canvas lane view -->
+      <div class="pane lane-pane">
+        <div class="pane-header">
+          <span class="pane-title">LANE_0</span>
+          <span class="pane-subtitle">// DEFENSE GRID</span>
+        </div>
+        <div class="canvas-container">
+          <canvas id="gameCanvas" width="600" height="300"></canvas>
+          <div class="scanlines"></div>
+        </div>
+      </div>
+
+      <!-- Right: Terminal scrollback + input -->
+      <div class="pane terminal-pane">
+        <div class="pane-header">
+          <span class="pane-title">TERMINAL</span>
+          <span class="pane-subtitle">// CMD INPUT</span>
+        </div>
+        <div id="scrollback" class="scrollback"></div>
+        <div class="input-line">
+          <span class="prompt">$</span>
+          <input type="text" id="cmdInput" autocomplete="off" spellcheck="false" autofocus>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom HUD -->
+    <div class="hud-bar">
+      <div class="hud-item">
+        <span class="hud-label">RAM</span>
+        <div class="hud-bar-container">
+          <div class="hud-bar-fill ram-bar" id="ramBar"></div>
+        </div>
+        <span class="hud-value" id="ramValue">128/128 MB</span>
+      </div>
+
+      <div class="hud-item">
+        <span class="hud-label">CORE</span>
+        <div class="hud-bar-container">
+          <div class="hud-bar-fill core-bar" id="coreBar"></div>
+        </div>
+        <span class="hud-value" id="coreValue">100/100 HP</span>
+      </div>
+
+      <div class="hud-item hud-stat">
+        <span class="hud-label">WAVE</span>
+        <span class="hud-value" id="waveValue">1</span>
+      </div>
+
+      <div class="hud-item hud-stat hud-mission hidden" id="hudMission">
+        <span class="hud-label">MISSION</span>
+        <span class="hud-value" id="missionTitle">-</span>
+      </div>
+
+      <div class="hud-item hud-stat">
+        <span class="hud-label">CREDITS</span>
+        <span class="hud-value" id="moneyValue">$50</span>
+      </div>
+
+      <div class="hud-item hud-stat">
+        <span class="hud-label">WPM</span>
+        <span class="hud-value" id="wpmValue">0</span>
+      </div>
+
+      <div class="hud-item hud-stat">
+        <span class="hud-label">DMG BONUS</span>
+        <span class="hud-value wpm-bonus" id="wpmBonusValue">1.00x</span>
+      </div>
+
+      <div class="hud-item hud-stat">
+        <span class="hud-label">ACC</span>
+        <span class="hud-value" id="accValue">100%</span>
+      </div>
+
+      <div class="hud-item hud-cooldowns">
+        <span class="hud-label">COOLDOWNS</span>
+        <div class="cooldown-indicators">
+          <span class="cooldown-item" id="cdRm" title="rm cooldown">rm</span>
+          <span class="cooldown-item" id="cdRmF" title="rm -f cooldown">rm -f</span>
+          <span class="cooldown-item" id="cdSync" title="sync cooldown">sync</span>
+        </div>
+      </div>
+
+      <div class="hud-item hud-stat">
+        <span class="hud-label">SPEED</span>
+        <span class="hud-value" id="speedValue">1x</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Endless mode game over overlay -->
+  <div id="gameOverlay" class="overlay hidden">
+    <div class="overlay-content">
+      <h1 class="overlay-title">SYSTEM FAILURE</h1>
+      <div class="overlay-subtitle">Core breach detected. Endless run terminated.</div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-item">
+          <span class="stat-label">WAVES SURVIVED</span>
+          <span class="stat-value" id="statWaves">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">BEST WPM</span>
+          <span class="stat-value" id="statBestWpm">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">AVG WPM</span>
+          <span class="stat-value" id="statAvgWpm">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">ACCURACY</span>
+          <span class="stat-value" id="statAccuracy">0%</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">TIME</span>
+          <span class="stat-value" id="statTime">0:00</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">MINIONS KILLED</span>
+          <span class="stat-value" id="statKills">0</span>
+        </div>
+      </div>
+
+      <div class="name-input-container">
+        <label for="playerName">OPERATOR ID:</label>
+        <input type="text" id="playerName" value="anon" maxlength="12" autocomplete="off">
+      </div>
+
+      <div class="overlay-buttons">
+        <button class="btn btn-primary" id="btnSaveScore">SAVE SCORE</button>
+        <button class="btn btn-secondary" id="btnLeaderboard">LEADERBOARD</button>
+        <button class="btn btn-primary" id="btnPlayAgain">PLAY AGAIN</button>
+        <button class="btn btn-secondary" id="btnBackToTitle">MAIN MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard overlay -->
+  <div id="leaderboardOverlay" class="overlay hidden">
+    <div class="overlay-content leaderboard-content">
+      <h1 class="overlay-title">TOP OPERATORS</h1>
+      <div class="leaderboard-table-container">
+        <table class="leaderboard-table" id="leaderboardTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>NAME</th>
+              <th>WAVES</th>
+              <th>WPM</th>
+              <th>ACC</th>
+              <th>TIME</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardBody">
+          </tbody>
+        </table>
+      </div>
+      <div class="overlay-buttons">
+        <button class="btn btn-secondary" id="btnResetLeaderboard">RESET DATA</button>
+        <button class="btn btn-primary" id="btnCloseLeaderboard">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Title screen overlay -->
+  <div id="titleOverlay" class="overlay">
+    <div class="overlay-content title-content">
+      <div class="title-logo">
+        <h1 class="game-title">NEURAL THROTTLE</h1>
+        <div class="game-subtitle">CYBERPUNK TOWER DEFENSE</div>
+      </div>
+
+      <div class="mode-buttons">
+        <button class="btn btn-mode btn-campaign" id="btnCampaign">
+          <span class="mode-icon">▶</span>
+          <span class="mode-name">CAMPAIGN</span>
+          <span class="mode-desc" id="campaignProgress">Mission 1 / 20</span>
+        </button>
+
+        <button class="btn btn-mode btn-endless" id="btnEndless">
+          <span class="mode-icon">∞</span>
+          <span class="mode-name">ENDLESS</span>
+          <span class="mode-desc">Survive infinite waves</span>
+        </button>
+      </div>
+
+      <div class="title-menu">
+        <button class="btn btn-secondary btn-small" id="btnTitleLeaderboard">LEADERBOARD</button>
+        <button class="btn btn-secondary btn-small" id="btnTutorialReplay">REPLAY TUTORIAL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mission select overlay -->
+  <div id="missionSelectOverlay" class="overlay hidden">
+    <div class="overlay-content mission-select-content">
+      <h1 class="overlay-title mission-select-title">CAMPAIGN MISSIONS</h1>
+      <div class="overlay-subtitle" id="missionSelectProgress">Progress: 0 / 20</div>
+
+      <div class="mission-grid" id="missionGrid">
+        <!-- Mission buttons will be generated here -->
+      </div>
+
+      <div class="overlay-buttons">
+        <button class="btn btn-secondary" id="btnMissionSelectBack">BACK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mission briefing overlay -->
+  <div id="missionBriefingOverlay" class="overlay hidden">
+    <div class="overlay-content briefing-content">
+      <div class="briefing-header">
+        <span class="briefing-mission-num" id="briefingMissionNum">MISSION 1</span>
+        <h1 class="briefing-title" id="briefingTitle">BOOT SEQUENCE</h1>
+      </div>
+      <p class="briefing-description" id="briefingDescription">Initialize defense protocols. Learn the basics.</p>
+
+      <div class="briefing-stats">
+        <div class="briefing-stat">
+          <span class="briefing-stat-label">WAVES</span>
+          <span class="briefing-stat-value" id="briefingWaves">3</span>
+        </div>
+        <div class="briefing-stat">
+          <span class="briefing-stat-label">DIFFICULTY</span>
+          <span class="briefing-stat-value" id="briefingDifficulty">EASY</span>
+        </div>
+      </div>
+
+      <div class="briefing-modifiers" id="briefingModifiers">
+        <!-- Modifier tags will be shown here if applicable -->
+      </div>
+
+      <div class="overlay-buttons">
+        <button class="btn btn-secondary" id="btnBriefingBack">BACK</button>
+        <button class="btn btn-primary" id="btnStartMission">START MISSION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Campaign victory overlay -->
+  <div id="campaignVictoryOverlay" class="overlay hidden">
+    <div class="overlay-content">
+      <h1 class="overlay-title victory-title">MISSION COMPLETE</h1>
+      <div class="overlay-subtitle">Neural link stable. Hostiles neutralized.</div>
+
+      <div class="stats-grid" id="victoryStatsGrid">
+        <div class="stat-item">
+          <span class="stat-label">MISSION</span>
+          <span class="stat-value" id="victoryMission">1</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">WAVES CLEARED</span>
+          <span class="stat-value" id="victoryWaves">3</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">BEST WPM</span>
+          <span class="stat-value" id="victoryBestWpm">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">ACCURACY</span>
+          <span class="stat-value" id="victoryAccuracy">100%</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">TIME</span>
+          <span class="stat-value" id="victoryTime">0:00</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">KILLS</span>
+          <span class="stat-value" id="victoryKills">0</span>
+        </div>
+      </div>
+
+      <div class="overlay-buttons">
+        <button class="btn btn-secondary" id="btnVictoryMissions">MISSION SELECT</button>
+        <button class="btn btn-primary" id="btnNextMission">NEXT MISSION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Campaign failure overlay -->
+  <div id="campaignFailureOverlay" class="overlay hidden">
+    <div class="overlay-content">
+      <h1 class="overlay-title">MISSION FAILED</h1>
+      <div class="overlay-subtitle">Core breach detected. Retry when ready.</div>
+
+      <div class="stats-grid" id="failureStatsGrid">
+        <div class="stat-item">
+          <span class="stat-label">MISSION</span>
+          <span class="stat-value" id="failureMission">1</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">WAVE REACHED</span>
+          <span class="stat-value" id="failureWave">1</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">BEST WPM</span>
+          <span class="stat-value" id="failureBestWpm">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">ACCURACY</span>
+          <span class="stat-value" id="failureAccuracy">100%</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">TIME</span>
+          <span class="stat-value" id="failureTime">0:00</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">KILLS</span>
+          <span class="stat-value" id="failureKills">0</span>
+        </div>
+      </div>
+
+      <div class="overlay-buttons">
+        <button class="btn btn-secondary" id="btnFailureMissions">MISSION SELECT</button>
+        <button class="btn btn-primary" id="btnRetryMission">RETRY MISSION</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load scripts in order -->
+  <script src="leaderboard.js"></script>
+  <script src="campaign.js"></script>
+  <script src="commands.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
