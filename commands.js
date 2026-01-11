@@ -6,22 +6,22 @@
 // COMMAND PATTERNS (Regex)
 // ===========================================
 const COMMAND_PATTERNS = {
-  rmWithArgs: /^rm\s+(-r?f\s+)?(\d+)$/,
-  rmAlone: /^rm(\s+-r?f)?$/,
-  buildWithArgs: /^build\s+(cannon)$/,
-  buildAlone: /^build$/,
-  buildInvalidArg: /^build\s+(\S+)$/,
-  upgradeWithArgs: /^upgrade\s+(cannon)$/,
-  upgradeAlone: /^upgrade$/,
-  upgradeInvalidArg: /^upgrade\s+(\S+)$/,
-  sync: /^sync$/,
-  killall: /^killall$/,
-  speedWithArgs: /^speed\s+(\d+)$/,
-  speedAlone: /^speed$/,
-  pause: /^pause$/,
-  help: /^help(?:\s+(\w+))?$/,
-  clear: /^clear$/,
-  status: /^status$/
+  rmWithArgs: /^rm\s+(-r?f\s+)?(\d+)$/i,
+  rmAlone: /^rm(\s+-r?f)?$/i,
+  buildWithArgs: /^build\s+(cannon)$/i,
+  buildAlone: /^build$/i,
+  buildInvalidArg: /^build\s+(\S+)$/i,
+  upgradeWithArgs: /^upgrade\s+(cannon)$/i,
+  upgradeAlone: /^upgrade$/i,
+  upgradeInvalidArg: /^upgrade\s+(\S+)$/i,
+  sync: /^sync$/i,
+  killall: /^killall$/i,
+  speedWithArgs: /^speed\s+(\d+)$/i,
+  speedAlone: /^speed$/i,
+  pause: /^pause$/i,
+  help: /^help(?:\s+(\w+))?$/i,
+  clear: /^clear$/i,
+  status: /^status$/i
 };
 
 // ===========================================
@@ -297,7 +297,7 @@ function handleBuildMissingArgs(args) {
 }
 
 function handleBuildInvalidArg(args) {
-  GameAPI.log(`build: unknown structure "${args[0]}"`, 'error');
+  GameAPI.log(`build: unknown structure "${args[0]?.toLowerCase()}"`, 'error');
   GameAPI.log('Available: cannon', 'info');
   if (typeof playSound === 'function') playSound('cmd.error');
   return false;
@@ -311,7 +311,7 @@ function handleUpgradeMissingArgs(args) {
 }
 
 function handleUpgradeInvalidArg(args) {
-  GameAPI.log(`upgrade: unknown structure "${args[0]}"`, 'error');
+  GameAPI.log(`upgrade: unknown structure "${args[0]?.toLowerCase()}"`, 'error');
   GameAPI.log('Available: cannon', 'info');
   if (typeof playSound === 'function') playSound('cmd.error');
   return false;
@@ -343,7 +343,7 @@ function handleRm(args) {
   let force = false;
   let indexStr;
 
-  if (args[0] && args[0].trim() === '-f') {
+  if (args[0] && args[0].trim().toLowerCase() === '-f') {
     force = true;
     indexStr = args[1];
   } else {
@@ -383,7 +383,7 @@ function handleBuild(args) {
     return false;
   }
 
-  const type = args[0];
+  const type = args[0]?.toLowerCase();
 
   if (type !== 'cannon') {
     GameAPI.log(`build: unknown structure "${type}"`, 'error');
@@ -411,7 +411,7 @@ function handleUpgrade(args) {
     return false;
   }
 
-  const type = args[0];
+  const type = args[0]?.toLowerCase();
 
   if (type !== 'cannon') {
     GameAPI.log(`upgrade: unknown structure "${type}"`, 'error');
