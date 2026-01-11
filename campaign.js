@@ -215,8 +215,8 @@ const MISSIONS = [
       { count: 11, interval: 1450, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.2, heavy: 0.2 }, speedScale: 1.18 }
     ],
     modifiers: {
-      syncCooldownMultiplier: 1.4,  // 8.4 seconds instead of 6 (was 1.5)
-      startMoney: 90
+      syncCooldownMultiplier: 1.15,  // Reduced from 1.4 - Campaign+ already adds +20%
+      startMoney: 100  // More starting money to help get towers up
     }
   },
   {
@@ -233,9 +233,8 @@ const MISSIONS = [
       { count: 11, interval: 1400, weights: { grunt: 0.25, swarm: 0.3, shielded: 0.25, heavy: 0.2 }, speedScale: 1.18 }
     ],
     modifiers: {
-      ramMaxMultiplier: 0.8,  // 102 MB instead of 128 (was 0.75)
-      syncRestoreMultiplier: 0.85,  // 60 MB instead of 70 (was 0.8)
-      startMoney: 85
+      ramMaxMultiplier: 0.9,  // 115 MB instead of 128 - less punishing with Campaign+
+      startMoney: 100  // More starting money for towers
     }
   },
   {
@@ -252,9 +251,8 @@ const MISSIONS = [
       { count: 12, interval: 1400, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.25, heavy: 0.15 }, speedScale: 1.18 }
     ],
     modifiers: {
-      syncCooldownMultiplier: 1.4,
-      ramMaxMultiplier: 0.8,
-      startMoney: 110  // Extra starting money for towers
+      ramMaxMultiplier: 0.9,  // Less punishing RAM cap
+      startMoney: 120  // Extra starting money for towers
     }
   },
 
@@ -277,8 +275,8 @@ const MISSIONS = [
       { count: 11, interval: 1450, weights: { grunt: 0.3, swarm: 0.35, shielded: 0.2, heavy: 0.15 }, speedScale: 1.18 }
     ],
     modifiers: {
-      towerCostMultiplier: 1.3,  // Towers cost 30% more (was 50%)
-      startMoney: 70  // More starting money (was 50)
+      towerCostMultiplier: 1.15,  // Reduced from 1.3 - Campaign+ already adds +15%
+      startMoney: 95  // More starting money to offset
     }
   },
   {
@@ -287,15 +285,16 @@ const MISSIONS = [
     description: "Tower grid offline. Rely on manual commands.",
     waveCount: 5,
     waveConfig: [
-      { count: 5, interval: 1900, weights: { grunt: 0.5, swarm: 0.35, shielded: 0.1, heavy: 0.05 }, speedScale: 0.95 },
+      { count: 5, interval: 2000, weights: { grunt: 0.55, swarm: 0.35, shielded: 0.08, heavy: 0.02 }, speedScale: 0.92 },
+      { count: 5, interval: 1900, weights: { grunt: 0.5, swarm: 0.35, shielded: 0.12, heavy: 0.03 }, speedScale: 0.95 },
       { count: 6, interval: 1800, weights: { grunt: 0.45, swarm: 0.35, shielded: 0.15, heavy: 0.05 }, speedScale: 1.0 },
-      { count: 7, interval: 1700, weights: { grunt: 0.4, swarm: 0.35, shielded: 0.15, heavy: 0.1 }, speedScale: 1.05 },
-      { count: 8, interval: 1600, weights: { grunt: 0.35, swarm: 0.35, shielded: 0.2, heavy: 0.1 }, speedScale: 1.1 },
-      { count: 9, interval: 1550, weights: { grunt: 0.35, swarm: 0.35, shielded: 0.2, heavy: 0.1 }, speedScale: 1.12 }
+      { count: 7, interval: 1700, weights: { grunt: 0.4, swarm: 0.35, shielded: 0.17, heavy: 0.08 }, speedScale: 1.05 },
+      { count: 7, interval: 1650, weights: { grunt: 0.4, swarm: 0.35, shielded: 0.18, heavy: 0.07 }, speedScale: 1.08 }
     ],
     modifiers: {
       disableTowers: true,
-      startRam: 128  // Full RAM since no towers to help
+      startRam: 128,  // Full RAM since no towers to help
+      waveClearRamBonus: 55  // Extra RAM on wave clear to compensate for no towers
     }
   },
   {
@@ -312,9 +311,9 @@ const MISSIONS = [
       { count: 12, interval: 1400, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.25, heavy: 0.15 }, speedScale: 1.18 }
     ],
     modifiers: {
-      towerCostMultiplier: 1.2,
-      moneyBonusMultiplier: 0.85,  // 15% less money (was 25%)
-      startMoney: 80
+      // Removed towerCostMultiplier - Campaign+ already adds +15%
+      moneyBonusMultiplier: 0.9,  // Only 10% less money (was 15%)
+      startMoney: 95  // More starting money
     }
   },
 
@@ -337,8 +336,8 @@ const MISSIONS = [
     modifiers: {
       disableSync: true,
       startRam: 128,  // Full RAM to start
-      waveClearRamBonus: 60,  // More RAM on wave clear (was 50)
-      startMoney: 90  // Help get towers faster
+      waveClearRamBonus: 70,  // More RAM on wave clear to compensate for no sync
+      startMoney: 100  // Help get towers faster
     }
   },
   {
@@ -356,8 +355,8 @@ const MISSIONS = [
     ],
     modifiers: {
       disableForceRm: true,
-      rmDamageMultiplier: 1.4,  // Better buff (was 1.25)
-      startMoney: 90
+      rmDamageMultiplier: 1.5,  // Bigger buff to compensate for Campaign+ rm cooldowns
+      startMoney: 100
     }
   },
   {
@@ -374,8 +373,8 @@ const MISSIONS = [
       { count: 11, interval: 1450, weights: { grunt: 0.25, swarm: 0.4, shielded: 0.2, heavy: 0.15 }, speedScale: 1.18 }
     ],
     modifiers: {
-      coreHpMultiplier: 0.7,  // 84 HP (was 0.6 = 72 HP)
-      startMoney: 95
+      coreHpMultiplier: 0.8,  // 96 HP - less punishing with Campaign+'s +15% core damage
+      startMoney: 100
     }
   },
 
@@ -399,7 +398,7 @@ const MISSIONS = [
       { count: 14, interval: 1350, weights: { grunt: 0.2, swarm: 0.35, shielded: 0.25, heavy: 0.2 }, speedScale: 1.22 }
     ],
     modifiers: {
-      startMoney: 95,
+      startMoney: 105,  // Slight bump for Campaign+
       startRam: 128
     }
   },
@@ -419,7 +418,7 @@ const MISSIONS = [
       { count: 15, interval: 1300, weights: { grunt: 0.2, swarm: 0.35, shielded: 0.25, heavy: 0.2 }, speedScale: 1.25 }
     ],
     modifiers: {
-      startMoney: 100,
+      startMoney: 110,  // Slight bump for Campaign+
       startRam: 128
     }
   }

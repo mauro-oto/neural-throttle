@@ -135,12 +135,14 @@ const CONFIG = {
 // ===========================================
 // TUTORIAL SYSTEM
 // ===========================================
+const TUTORIAL_STEPS_KEY = 'nt_tutorial_steps';
+
 const tutorial = {
   enabled: true,
   globallyCompleted: false,  // Persisted across sessions
   paused: false,
   currentStep: null,
-  completedSteps: new Set(),
+  completedSteps: new Set(),  // Also persisted across sessions
   awaitingCommand: null,
 
   steps: {
@@ -372,6 +374,7 @@ const tutorial = {
     }
 
     this.completedSteps.add(this.currentStep);
+    this.saveCompletedSteps();  // Persist to localStorage
     this.paused = false;
     this.currentStep = null;
     this.awaitingCommand = null;
@@ -397,7 +400,7 @@ const tutorial = {
   reset() {
     this.paused = false;
     this.currentStep = null;
-    this.completedSteps.clear();
+    // Don't clear completedSteps - they persist across missions
     this.awaitingCommand = null;
     this.pendingCompletion = false;
     // Don't reset globallyCompleted here - that's persistent
@@ -407,13 +410,41 @@ const tutorial = {
   loadGlobalState() {
     this.globallyCompleted = isTutorialCompleted();
     this.forceReplay = false;
+
+    // Load completed steps from localStorage
+    try {
+      const savedSteps = localStorage.getItem(TUTORIAL_STEPS_KEY);
+      if (savedSteps) {
+        const stepsArray = JSON.parse(savedSteps);
+        this.completedSteps = new Set(stepsArray);
+      }
+    } catch (e) {
+      console.warn('Failed to load tutorial steps:', e);
+    }
+  },
+
+  // Save completed steps to localStorage
+  saveCompletedSteps() {
+    try {
+      const stepsArray = Array.from(this.completedSteps);
+      localStorage.setItem(TUTORIAL_STEPS_KEY, JSON.stringify(stepsArray));
+    } catch (e) {
+      console.warn('Failed to save tutorial steps:', e);
+    }
   },
 
   // Force replay of tutorial (user requested)
   enableReplay() {
     this.globallyCompleted = false;
     this.forceReplay = true;
+    this.completedSteps.clear();
     resetTutorialCompletion();
+    // Also clear saved steps
+    try {
+      localStorage.removeItem(TUTORIAL_STEPS_KEY);
+    } catch (e) {
+      // Ignore
+    }
   },
 
   // Check for tutorial triggers during gameplay
@@ -742,6 +773,7 @@ const GameAPI = {
     // Check if force rm is disabled by mission
     if (force && config.DISABLE_FORCE_RM) {
       this.log('rm -f: command disabled for this mission', 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
@@ -758,17 +790,20 @@ const GameAPI = {
     if (gameState.cooldowns[cooldownKey] > 0) {
       const remaining = gameState.cooldowns[cooldownKey].toFixed(1);
       this.log(`rm: throttled (${remaining}s remaining)`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
     if (gameState.ram < ramCost) {
       this.log(`rm: insufficient RAM (need ${ramCost} MB, have ${Math.floor(gameState.ram)} MB)`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
     const target = getMinionByIndex(index);
     if (!target) {
       this.log(`rm: no target at index ${index}`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
@@ -803,11 +838,13 @@ const GameAPI = {
     // Check if towers are disabled by mission
     if (config.DISABLE_TOWERS) {
       this.log('build: tower construction disabled for this mission', 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
     if (gameState.towerCount >= CONFIG.TOWER_MAX) {
       this.log(`build: max towers reached (${CONFIG.TOWER_MAX}). Use "upgrade cannon" instead.`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
@@ -816,6 +853,7 @@ const GameAPI = {
 
     if (gameState.money < cost) {
       this.log(`build: insufficient credits (need $${cost})`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
@@ -834,6 +872,11 @@ const GameAPI = {
 
     gameState.towers.push(tower);
 
+    // Play tower place sound
+    if (typeof playSound === 'function') {
+      playSound('tower.place');
+    }
+
     if (gameState.towerCount >= CONFIG.TOWER_MAX) {
       this.log(`build: cannon #${gameState.towerCount} deployed (MAX reached)`, 'success');
     } else {
@@ -850,11 +893,13 @@ const GameAPI = {
     // Check if towers are disabled by mission
     if (config.DISABLE_TOWERS) {
       this.log('upgrade: tower upgrades disabled for this mission', 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
     if (gameState.towers.length === 0) {
       this.log(`upgrade: no towers to upgrade`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
@@ -862,6 +907,7 @@ const GameAPI = {
 
     if (gameState.money < cost) {
       this.log(`upgrade: insufficient credits (need $${cost} for ${gameState.towers.length} towers)`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
@@ -883,12 +929,14 @@ const GameAPI = {
     // Check if sync is disabled by mission
     if (config.DISABLE_SYNC) {
       this.log('sync: command disabled for this mission', 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
     if (gameState.cooldowns.sync > 0) {
       const remaining = gameState.cooldowns.sync.toFixed(1);
       this.log(`sync: busy (${remaining}s remaining)`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
@@ -913,18 +961,21 @@ const GameAPI = {
     if (gameState.cooldowns.killall > 0) {
       const remaining = gameState.cooldowns.killall.toFixed(1);
       this.log(`killall: system recharging (${remaining}s remaining)`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
     // Check if any enemies exist
     if (gameState.minions.length === 0) {
       this.log('killall: no active processes to terminate', 'warning');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
     // Check RAM (unless free use from tutorial)
     if (!freeUse && gameState.ram < ramCost) {
       this.log(`killall: insufficient RAM (need ${ramCost} MB, have ${Math.floor(gameState.ram)} MB)`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
       return false;
     }
 
@@ -1018,6 +1069,11 @@ const GameAPI = {
 
     hudElements.gameStatus.textContent = '[ ONLINE ]';
     hudElements.gameStatus.style.color = '#00ff88';
+
+    // Play mission start sound
+    if (typeof playSound === 'function') {
+      playSound('game.missionStart');
+    }
 
     this.log('=== NEURAL THROTTLE INITIALIZED ===', 'system');
 
@@ -1238,6 +1294,11 @@ function killMinion(minion, source) {
   // Spawn death particles (shatter effect)
   spawnDeathParticles(minion.x, minion.y, baseStats.color);
 
+  // Play minion death sound (rate-limited in audio.js)
+  if (typeof playSound === 'function') {
+    playSound('world.minionDeath');
+  }
+
   const idx = gameState.minions.indexOf(minion);
   if (idx > -1) {
     gameState.minions.splice(idx, 1);
@@ -1327,6 +1388,15 @@ function campaignVictory() {
   hudElements.gameStatus.textContent = '[ MISSION COMPLETE ]';
   hudElements.gameStatus.style.color = '#00ff88';
 
+  // Play appropriate victory sound
+  if (typeof playSound === 'function') {
+    if (justUnlockedCampaignPlus) {
+      playSound('game.unlockCampaignPlus');
+    } else {
+      playSound('game.missionComplete');
+    }
+  }
+
   GameAPI.log('=== MISSION COMPLETE ===', 'system');
 
   const stats = calculateFinalStats();
@@ -1345,6 +1415,11 @@ function gameOver() {
 
   hudElements.gameStatus.textContent = '[ OFFLINE ]';
   hudElements.gameStatus.style.color = '#ff3366';
+
+  // Play mission fail sound
+  if (typeof playSound === 'function') {
+    playSound('game.missionFail');
+  }
 
   GameAPI.log('=== CORE BREACH - SYSTEM FAILURE ===', 'error');
 
@@ -1435,6 +1510,11 @@ function updateMinions(dt) {
         gameState.minions.splice(idx, 1);
       }
 
+      // Play core hit sound (rate-limited in audio.js)
+      if (typeof playSound === 'function') {
+        playSound('world.coreHit');
+      }
+
       GameAPI.log(`core breach: -${damage} HP (${minion.type})`, 'error');
 
       if (gameState.coreHp <= 0) {
@@ -1463,11 +1543,20 @@ function updateTowers(dt) {
 
           createProjectile(tower, target);
 
+          // Play tower fire sound (rate-limited in audio.js)
+          if (typeof playSound === 'function') {
+            playSound('tower.fire');
+          }
+
           if (target.hp <= 0) {
             killMinion(target, 'tower');
           }
         } else {
           createProjectile(tower, target, true);
+          // Still play sound for ineffective shots (sounds different with no damage)
+          if (typeof playSound === 'function') {
+            playSound('tower.fire');
+          }
         }
 
         tower.fireTimer = 1 / CONFIG.TOWER_FIRE_RATE;
@@ -2301,7 +2390,10 @@ function showMissionSelect(mode = null) {
     `;
 
     if (isUnlocked) {
-      btn.addEventListener('click', () => showMissionBriefing(mission.id));
+      btn.addEventListener('click', () => {
+        if (typeof playSound === 'function') playSound('ui.menuClick');
+        showMissionBriefing(mission.id);
+      });
     }
 
     grid.appendChild(btn);
@@ -2464,6 +2556,14 @@ function init() {
   loadCampaignProgress();
   tutorial.loadGlobalState();
 
+  // Initialize audio system
+  if (typeof initAudio === 'function') {
+    initAudio();
+  }
+  if (typeof Audio !== 'undefined' && Audio.setupUI) {
+    Audio.setupUI();
+  }
+
   setInterval(gameTick, CONFIG.TICK_MS);
   requestAnimationFrame(renderLoop);
 
@@ -2477,6 +2577,7 @@ function init() {
 function setupOverlayButtons() {
   // Endless mode game over buttons
   document.getElementById('btnSaveScore').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     const name = document.getElementById('playerName').value.trim() || 'anon';
     const stats = calculateFinalStats();
     saveScore({
@@ -2494,12 +2595,14 @@ function setupOverlayButtons() {
   });
 
   document.getElementById('btnLeaderboard').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('gameOverlay').classList.add('hidden');
     renderLeaderboard();
     document.getElementById('leaderboardOverlay').classList.remove('hidden');
   });
 
   document.getElementById('btnPlayAgain').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('gameOverlay').classList.add('hidden');
     document.getElementById('btnSaveScore').disabled = false;
     document.getElementById('btnSaveScore').textContent = 'SAVE SCORE';
@@ -2508,6 +2611,7 @@ function setupOverlayButtons() {
   });
 
   document.getElementById('btnBackToTitle').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('gameOverlay').classList.add('hidden');
     document.getElementById('btnSaveScore').disabled = false;
     document.getElementById('btnSaveScore').textContent = 'SAVE SCORE';
@@ -2517,12 +2621,14 @@ function setupOverlayButtons() {
 
   document.getElementById('btnResetLeaderboard').addEventListener('click', () => {
     if (confirm('Reset all leaderboard data?')) {
+      if (typeof playSound === 'function') playSound('ui.menuClick');
       resetLeaderboard();
       renderLeaderboard();
     }
   });
 
   document.getElementById('btnCloseLeaderboard').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('leaderboardOverlay').classList.add('hidden');
     if (gameState.gameOver) {
       if (gameState.gameMode === 'endless') {
@@ -2537,6 +2643,7 @@ function setupOverlayButtons() {
 function setupTitleScreenButtons() {
   // Campaign button
   document.getElementById('btnCampaign').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     setActiveCampaignMode('campaign');
     hideTitleScreen();
     showMissionSelect('campaign');
@@ -2545,9 +2652,10 @@ function setupTitleScreenButtons() {
   // Campaign+ button
   document.getElementById('btnCampaignPlus').addEventListener('click', () => {
     if (!isCampaignPlusUnlocked()) {
-      // Show message that it's locked
+      if (typeof playSound === 'function') playSound('cmd.error');
       return;
     }
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     setActiveCampaignMode('campaign_plus');
     hideTitleScreen();
     showMissionSelect('campaign_plus');
@@ -2555,6 +2663,7 @@ function setupTitleScreenButtons() {
 
   // Endless button
   document.getElementById('btnEndless').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     hideTitleScreen();
     GameAPI.startEndlessMode();
     cmdInput.focus();
@@ -2562,6 +2671,7 @@ function setupTitleScreenButtons() {
 
   // Leaderboard from title
   document.getElementById('btnTitleLeaderboard').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     hideTitleScreen();
     renderLeaderboard();
     document.getElementById('leaderboardOverlay').classList.remove('hidden');
@@ -2569,6 +2679,7 @@ function setupTitleScreenButtons() {
 
   // Replay tutorial
   document.getElementById('btnTutorialReplay').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     tutorial.enableReplay();
     setActiveCampaignMode('campaign');
     hideTitleScreen();
@@ -2582,6 +2693,7 @@ function setupTitleScreenButtons() {
 function setupCampaignButtons() {
   // Mission select back button
   document.getElementById('btnMissionSelectBack').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     hideMissionSelect();
     showTitleScreen();
   });
@@ -2589,6 +2701,7 @@ function setupCampaignButtons() {
   // Mode tabs in mission select
   document.getElementById('tabCampaign').addEventListener('click', () => {
     if (getActiveCampaignMode() !== 'campaign') {
+      if (typeof playSound === 'function') playSound('ui.menuClick');
       showMissionSelect('campaign');
     }
   });
@@ -2596,12 +2709,14 @@ function setupCampaignButtons() {
   document.getElementById('tabCampaignPlus').addEventListener('click', () => {
     if (!isCampaignPlusUnlocked()) return;
     if (getActiveCampaignMode() !== 'campaign_plus') {
+      if (typeof playSound === 'function') playSound('ui.menuClick');
       showMissionSelect('campaign_plus');
     }
   });
 
   // Mission briefing back button
   document.getElementById('btnBriefingBack').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     hideMissionBriefing();
     showMissionSelect();
   });
@@ -2610,6 +2725,7 @@ function setupCampaignButtons() {
   document.getElementById('btnStartMission').addEventListener('click', (e) => {
     const missionId = parseInt(e.target.dataset.missionId);
     if (missionId) {
+      if (typeof playSound === 'function') playSound('ui.menuClick');
       hideMissionBriefing();
       GameAPI.startCampaignMission(missionId);
       cmdInput.focus();
@@ -2618,12 +2734,14 @@ function setupCampaignButtons() {
 
   // Victory screen buttons
   document.getElementById('btnVictoryMissions').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('campaignVictoryOverlay').classList.add('hidden');
     gameState.gameOver = false;
     showMissionSelect();
   });
 
   document.getElementById('btnNextMission').addEventListener('click', (e) => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     const nextMissionId = parseInt(e.target.dataset.missionId);
     document.getElementById('campaignVictoryOverlay').classList.add('hidden');
     gameState.gameOver = false;
@@ -2637,12 +2755,14 @@ function setupCampaignButtons() {
 
   // Failure screen buttons
   document.getElementById('btnFailureMissions').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('campaignFailureOverlay').classList.add('hidden');
     gameState.gameOver = false;
     showMissionSelect();
   });
 
   document.getElementById('btnRetryMission').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('campaignFailureOverlay').classList.add('hidden');
     gameState.gameOver = false;
 
@@ -2655,12 +2775,14 @@ function setupCampaignButtons() {
 
   // Campaign Complete overlay buttons (shown when Campaign+ is unlocked)
   document.getElementById('btnCompleteMenu').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('campaignCompleteOverlay').classList.add('hidden');
     gameState.gameOver = false;
     showTitleScreen();
   });
 
   document.getElementById('btnStartCampaignPlus').addEventListener('click', () => {
+    if (typeof playSound === 'function') playSound('ui.menuClick');
     document.getElementById('campaignCompleteOverlay').classList.add('hidden');
     gameState.gameOver = false;
     setActiveCampaignMode('campaign_plus');

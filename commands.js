@@ -240,6 +240,7 @@ function executeCommand(input) {
     const cmd = input.split(' ')[0];
     GameAPI.log(`command not found: ${cmd}`, 'error');
     GameAPI.log('Type "help" for available commands.', 'info');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
@@ -284,36 +285,42 @@ function handleRmMissingArgs(args) {
     GameAPI.log('rm: missing operand (index)', 'error');
     GameAPI.log('Usage: rm <index> or rm -f <index>', 'info');
   }
+  if (typeof playSound === 'function') playSound('cmd.error');
   return false;
 }
 
 function handleBuildMissingArgs(args) {
   GameAPI.log('build: missing operand (structure type)', 'error');
   GameAPI.log('Usage: build cannon', 'info');
+  if (typeof playSound === 'function') playSound('cmd.error');
   return false;
 }
 
 function handleBuildInvalidArg(args) {
   GameAPI.log(`build: unknown structure "${args[0]}"`, 'error');
   GameAPI.log('Available: cannon', 'info');
+  if (typeof playSound === 'function') playSound('cmd.error');
   return false;
 }
 
 function handleUpgradeMissingArgs(args) {
   GameAPI.log('upgrade: missing operand (structure type)', 'error');
   GameAPI.log('Usage: upgrade cannon', 'info');
+  if (typeof playSound === 'function') playSound('cmd.error');
   return false;
 }
 
 function handleUpgradeInvalidArg(args) {
   GameAPI.log(`upgrade: unknown structure "${args[0]}"`, 'error');
   GameAPI.log('Available: cannon', 'info');
+  if (typeof playSound === 'function') playSound('cmd.error');
   return false;
 }
 
 function handleSpeedMissingArgs(args) {
   GameAPI.log('speed: missing operand (multiplier)', 'error');
   GameAPI.log('Usage: speed <0|1|2> (0=pause)', 'info');
+  if (typeof playSound === 'function') playSound('cmd.error');
   return false;
 }
 
@@ -321,12 +328,14 @@ function handleRm(args) {
   // Check if game is running
   if (!gameState.running) {
     GameAPI.log('rm: no active session', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
   // Check if game is paused
   if (gameState.paused && !tutorial.paused) {
     GameAPI.log('rm: game is paused (use "speed 1" to resume)', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
@@ -345,22 +354,32 @@ function handleRm(args) {
 
   if (isNaN(index) || index < 0) {
     GameAPI.log('rm: invalid index (must be >= 0)', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
-  return GameAPI.attack(index, force);
+  const success = GameAPI.attack(index, force);
+
+  // Play appropriate sound on success (error sounds handled in GameAPI.attack)
+  if (success && typeof playSound === 'function') {
+    playSound(force ? 'cmd.rmForce' : 'cmd.rm');
+  }
+
+  return success;
 }
 
 function handleBuild(args) {
   // Check if game is running
   if (!gameState.running) {
     GameAPI.log('build: no active session', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
   // Check if game is paused
   if (gameState.paused && !tutorial.paused) {
     GameAPI.log('build: game is paused (use "speed 1" to resume)', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
@@ -369,9 +388,11 @@ function handleBuild(args) {
   if (type !== 'cannon') {
     GameAPI.log(`build: unknown structure "${type}"`, 'error');
     GameAPI.log('Available: cannon', 'info');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
+  // Note: tower.place sound is played in GameAPI.buildTower on success
   return GameAPI.buildTower(type);
 }
 
@@ -379,12 +400,14 @@ function handleUpgrade(args) {
   // Check if game is running
   if (!gameState.running) {
     GameAPI.log('upgrade: no active session', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
   // Check if game is paused
   if (gameState.paused && !tutorial.paused) {
     GameAPI.log('upgrade: game is paused (use "speed 1" to resume)', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
@@ -393,45 +416,62 @@ function handleUpgrade(args) {
   if (type !== 'cannon') {
     GameAPI.log(`upgrade: unknown structure "${type}"`, 'error');
     GameAPI.log('Available: cannon', 'info');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
-  return GameAPI.upgradeTowers();
+  const success = GameAPI.upgradeTowers();
+  if (success && typeof playSound === 'function') {
+    playSound('tower.place'); // Reuse tower build sound for upgrade
+  }
+  return success;
 }
 
 function handleSync(args) {
   // Check if game is running
   if (!gameState.running) {
     GameAPI.log('sync: no active session', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
   // Check if game is paused
   if (gameState.paused && !tutorial.paused) {
     GameAPI.log('sync: game is paused (use "speed 1" to resume)', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
-  return GameAPI.syncRam();
+  const success = GameAPI.syncRam();
+  if (success && typeof playSound === 'function') {
+    playSound('cmd.sync');
+  }
+  return success;
 }
 
 function handleKillall(args) {
   // Check if game is running
   if (!gameState.running) {
     GameAPI.log('killall: no active session', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
   // Check if game is paused
   if (gameState.paused && !tutorial.paused) {
     GameAPI.log('killall: game is paused (use "speed 1" to resume)', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
   // Check if this is a tutorial free use
   const freeUse = tutorial.paused && tutorial.currentStep === 'killallIntro';
 
-  return GameAPI.killAll(freeUse);
+  const success = GameAPI.killAll(freeUse);
+  if (success && typeof playSound === 'function') {
+    playSound('cmd.killall');
+  }
+  return success;
 }
 
 function handleSpeed(args) {
@@ -440,10 +480,15 @@ function handleSpeed(args) {
 
   if (isNaN(speed) || ![0, 1, 2].includes(speed)) {
     GameAPI.log('speed: invalid value (must be 0, 1, or 2)', 'error');
+    if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
 
-  return GameAPI.setSpeed(speed);
+  const success = GameAPI.setSpeed(speed);
+  if (success && typeof playSound === 'function') {
+    playSound('ui.menuClick');
+  }
+  return success;
 }
 
 function handlePause(args) {

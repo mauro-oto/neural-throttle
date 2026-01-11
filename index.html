@@ -33,6 +33,11 @@
         <div class="pane-header">
           <span class="pane-title">TERMINAL</span>
           <span class="pane-subtitle">// CMD INPUT</span>
+          <div class="audio-controls-header">
+            <button class="audio-mute-btn" id="audioMuteBtn" title="Toggle mute">🔊</button>
+            <input type="range" class="audio-volume-slider" id="audioVolumeSlider" min="0" max="100" value="35" title="Volume">
+            <span class="audio-volume-label" id="audioVolumeLabel">35</span>
+          </div>
         </div>
         <div id="scrollback" class="scrollback"></div>
         <div class="input-line">
@@ -389,6 +394,8 @@
   </div>
 
   <!-- Load scripts in order -->
+  <script src="zzfx.js"></script>
+  <script src="audio.js"></script>
   <script src="leaderboard.js"></script>
   <script src="campaign.js"></script>
   <script src="commands.js"></script>
