@@ -1795,6 +1795,21 @@ const commandHistory = {
   tempInput: ''  // Store current input when navigating history
 };
 
+// Update target preview based on current input
+function updateTargetPreview() {
+  const input = cmdInput.value.trim().toLowerCase();
+  
+  // Match "rm <index>" or "rm -f <index>" or "rm -rf <index>"
+  const rmMatch = input.match(/^rm\s+(?:-r?f\s+)?(\d+)$/);
+  
+  if (rmMatch) {
+    const index = parseInt(rmMatch[1], 10);
+    gameState.previewTargetIndex = index;
+  } else {
+    gameState.previewTargetIndex = null;
+  }
+}
+
 function setupInputHandling() {
   cmdInput.addEventListener('keydown', (e) => {
     // Handle up arrow - go back in history
@@ -1812,6 +1827,7 @@ function setupInputHandling() {
       if (commandHistory.index < commandHistory.entries.length - 1) {
         commandHistory.index++;
         cmdInput.value = commandHistory.entries[commandHistory.entries.length - 1 - commandHistory.index];
+        updateTargetPreview();
       }
       return;
     }
@@ -1830,6 +1846,7 @@ function setupInputHandling() {
       } else {
         cmdInput.value = commandHistory.entries[commandHistory.entries.length - 1 - commandHistory.index];
       }
+      updateTargetPreview();
       return;
     }
     
@@ -1891,18 +1908,7 @@ function setupInputHandling() {
   });
 
   cmdInput.addEventListener('input', () => {
-    // Parse input to highlight target preview
-    const input = cmdInput.value.trim().toLowerCase();
-    
-    // Match "rm <index>" or "rm -f <index>"
-    const rmMatch = input.match(/^rm\s+(?:-f\s+)?(\d+)$/);
-    
-    if (rmMatch) {
-      const index = parseInt(rmMatch[1], 10);
-      gameState.previewTargetIndex = index;
-    } else {
-      gameState.previewTargetIndex = null;
-    }
+    updateTargetPreview();
   });
 
   document.addEventListener('click', (e) => {
