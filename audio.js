@@ -105,25 +105,25 @@ const SFX = {
   // GAME FLOW SOUNDS - Impactful but not loud
   // =========================================
   'game.missionStart': () => [
-    0.3,    // volume
+    0.18,   // volume - softer
     0,      // randomness
-    220,    // frequency - low start
-    0.02,   // attack
-    0.1,    // sustain
-    0.2,    // release
-    0,      // shape - sine
+    440,    // frequency - pleasant mid tone
+    0.03,   // attack - slightly softer onset
+    0.08,   // sustain
+    0.15,   // release
+    0,      // shape - sine (smooth)
     1,      // shapeCurve
-    200,    // slide - sweeps up
+    40,     // slide - gentle rise
     0,      // deltaSlide
-    110,    // pitchJump
-    0.08,   // pitchJumpTime
+    0,      // pitchJump - removed
+    0,      // pitchJumpTime
     0,      // repeatTime
     0,      // noise
     0,      // modulation
     0,      // bitCrush
     0,      // delay
-    0.8,    // sustainVolume
-    0.05,   // decay
+    0.7,    // sustainVolume
+    0.04,   // decay
     0       // tremolo
   ],
 
