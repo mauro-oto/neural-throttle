@@ -387,25 +387,25 @@ const SFX = {
   ],
 
   'tower.place': () => [
-    0.25,   // volume
+    0.15,   // volume - softer
     0,      // randomness
-    300,    // frequency
+    520,    // frequency - pleasant mid tone
     0.02,   // attack
-    0.06,   // sustain
-    0.1,    // release
-    3,      // shape - triangle
-    0.6,    // shapeCurve
-    100,    // slide - build up
+    0.05,   // sustain
+    0.12,   // release - gentle fade
+    0,      // shape - sine (smooth)
+    1,      // shapeCurve
+    30,     // slide - gentle rise
     0,      // deltaSlide
-    60,     // pitchJump
-    0.05,   // pitchJumpTime
+    0,      // pitchJump - no jump
+    0,      // pitchJumpTime
     0,      // repeatTime
-    0.05,   // noise
+    0,      // noise - none
     0,      // modulation
     0,      // bitCrush
     0,      // delay
-    0.7,    // sustainVolume
-    0.02,   // decay
+    0.8,    // sustainVolume
+    0.03,   // decay
     0       // tremolo
   ]
 };
