@@ -19,6 +19,8 @@ const COMMAND_PATTERNS = {
   speedWithArgs: /^speed\s+(\d+)$/i,
   speedAlone: /^speed$/i,
   pause: /^pause$/i,
+  targetWithArgs: /^target\s+(\w+)$/i,
+  targetAlone: /^target$/i,
   help: /^help(?:\s+(\w+))?$/i,
   clear: /^clear$/i,
   status: /^status$/i
@@ -36,8 +38,9 @@ const HELP_TEXT = {
     '  upgrade cannon   - Upgrade all towers (+40% dmg)',
     '  sync             - Restore +70 MB RAM (6s cd)',
     '  killall          - Terminate ALL enemies (40 MB, 75s cd)',
+    '  target <mode>    - Set tower targeting (first|strong|weak)',
     '  pause            - Pause the game',
-    '  speed <0|1|2>    - Set speed (0=pause, 1=normal, 2=fast)',
+    '  speed <0-3>      - Set speed (0=pause, 1/2/3 = 1x/1.25x/1.5x)',
     '  status           - Show current status',
     '  clear            - Clear terminal',
     '  help [cmd]       - Show help',
@@ -120,17 +123,31 @@ const HELP_TEXT = {
     'All enemies are killed and you receive full rewards.',
   ],
   speed: [
-    'speed - Change game speed',
+    'speed - Change game speed (true timescale)',
     '',
     'Usage:',
     '  speed 0    Pause the game',
     '  speed 1    Normal speed (1x)',
-    '  speed 2    Fast (2x)',
+    '  speed 2    Faster (1.25x)',
+    '  speed 3    Fast (1.5x)',
     '',
-    'Higher speeds make everything faster,',
-    'including cooldowns and enemy movement.',
+    'True timescale: ALL systems scale equally.',
+    'Cooldowns, spawns, and enemies all speed up.',
     '',
     'TIP: You can also type "pause" to pause.',
+  ],
+  target: [
+    'target - Set tower targeting mode',
+    '',
+    'Usage:',
+    '  target first    Target closest to core',
+    '  target strong   Target highest HP enemy',
+    '  target weak     Target lowest HP enemy',
+    '',
+    'All towers use the same targeting mode.',
+    'Tie-breaker: closest to core wins.',
+    '',
+    'Setting persists across sessions.',
   ],
   pause: [
     'pause - Pause the game',
@@ -175,6 +192,9 @@ function parseCommand(input) {
   if (COMMAND_PATTERNS.speedAlone.test(trimmed)) {
     return { command: 'speedMissingArgs', args: [] };
   }
+  if (COMMAND_PATTERNS.targetAlone.test(trimmed)) {
+    return { command: 'targetMissingArgs', args: [] };
+  }
 
   // Check rm with proper args
   const rmMatch = trimmed.match(COMMAND_PATTERNS.rmWithArgs);
@@ -186,11 +206,12 @@ function parseCommand(input) {
   }
 
   // Check other commands with args
-  const commandsWithArgs = ['buildWithArgs', 'upgradeWithArgs', 'speedWithArgs', 'pause', 'help', 'sync', 'killall', 'clear', 'status'];
+  const commandsWithArgs = ['buildWithArgs', 'upgradeWithArgs', 'speedWithArgs', 'targetWithArgs', 'pause', 'help', 'sync', 'killall', 'clear', 'status'];
   const commandNames = {
     buildWithArgs: 'build',
     upgradeWithArgs: 'upgrade',
     speedWithArgs: 'speed',
+    targetWithArgs: 'target',
     pause: 'pause',
     help: 'help',
     sync: 'sync',
@@ -257,6 +278,8 @@ function executeCommand(input) {
     killall: handleKillall,
     speed: handleSpeed,
     speedMissingArgs: handleSpeedMissingArgs,
+    target: handleTarget,
+    targetMissingArgs: handleTargetMissingArgs,
     pause: handlePause,
     help: handleHelp,
     clear: handleClear,
@@ -318,8 +341,8 @@ function handleUpgradeInvalidArg(args) {
 }
 
 function handleSpeedMissingArgs(args) {
-  GameAPI.log('speed: missing operand (multiplier)', 'error');
-  GameAPI.log('Usage: speed <0|1|2> (0=pause)', 'info');
+  GameAPI.log('speed: missing operand (level)', 'error');
+  GameAPI.log('Usage: speed <0|1|2|3> (0=pause)', 'info');
   if (typeof playSound === 'function') playSound('cmd.error');
   return false;
 }
@@ -478,8 +501,9 @@ function handleSpeed(args) {
   const speedStr = args[0];
   const speed = parseInt(speedStr, 10);
 
-  if (isNaN(speed) || ![0, 1, 2].includes(speed)) {
-    GameAPI.log('speed: invalid value (must be 0, 1, or 2)', 'error');
+  // Valid input levels: 0, 1, 2, 3 (mapped to 0, 1x, 1.25x, 1.5x internally)
+  if (isNaN(speed) || ![0, 1, 2, 3].includes(speed)) {
+    GameAPI.log('speed: invalid value (use 0, 1, 2, or 3)', 'error');
     if (typeof playSound === 'function') playSound('cmd.error');
     return false;
   }
@@ -489,6 +513,22 @@ function handleSpeed(args) {
     playSound('ui.menuClick');
   }
   return success;
+}
+
+function handleTarget(args) {
+  const mode = args[0];
+  const success = GameAPI.setTargetMode(mode);
+  if (success && typeof playSound === 'function') {
+    playSound('ui.menuClick');
+  }
+  return success;
+}
+
+function handleTargetMissingArgs(args) {
+  GameAPI.log('target: missing operand (mode)', 'error');
+  GameAPI.log('Usage: target <first|strong|weak>', 'info');
+  if (typeof playSound === 'function') playSound('cmd.error');
+  return false;
 }
 
 function handlePause(args) {
@@ -537,6 +577,7 @@ function handleStatus(args) {
   GameAPI.log(`Enemies: ${status.minions}`, 'info');
   GameAPI.log(`Towers: ${status.towers}/${status.towerMax} (Level ${status.towerLevel})`, 'info');
   GameAPI.log(`Speed: ${status.speed}x`, 'info');
+  GameAPI.log(`Target: ${gameState.targetMode}`, 'info');
 
   // Cooldown status
   const cds = [];

@@ -1190,6 +1190,14 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Targeting mode display */
+#targetValue {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--neon-amber);
+  text-shadow: 0 0 6px var(--neon-amber);
+}
+
 /* ===========================================
    Audio Controls - Terminal Themed (in header)
    =========================================== */

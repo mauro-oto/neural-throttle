@@ -128,9 +128,40 @@ const CONFIG = {
     { count: 26, interval: 800,  weights: { grunt: 0.1, swarm: 0.3, shielded: 0.3, heavy: 0.3 }, speedScale: 1.42 }
   ],
 
-  // Speed multiplier options (0 = pause)
-  SPEED_OPTIONS: [0, 1, 2]
+  // Speed input options (0 = pause, 1/2/3 = speed levels)
+  // Mapped to true timescale values via SPEED_TIMESCALE
+  SPEED_OPTIONS: [0, 1, 2, 3],
+  // True timescale values: input -> actual multiplier
+  SPEED_TIMESCALE: { 0: 0, 1: 1, 2: 1.25, 3: 1.5 }
 };
+
+// ===========================================
+// TOWER TARGETING SYSTEM
+// ===========================================
+const TARGETING_MODES = ['first', 'strong', 'weak'];
+const TARGETING_STORAGE_KEY = 'nt_target_mode';
+
+// Load targeting mode from localStorage or default to 'first'
+function loadTargetingMode() {
+  try {
+    const saved = localStorage.getItem(TARGETING_STORAGE_KEY);
+    if (saved && TARGETING_MODES.includes(saved)) {
+      return saved;
+    }
+  } catch (e) {
+    // localStorage unavailable
+  }
+  return 'first';
+}
+
+// Save targeting mode to localStorage
+function saveTargetingMode(mode) {
+  try {
+    localStorage.setItem(TARGETING_STORAGE_KEY, mode);
+  } catch (e) {
+    // localStorage unavailable
+  }
+}
 
 // ===========================================
 // TUTORIAL SYSTEM
@@ -265,7 +296,8 @@ const tutorial = {
         '',
         'Want more challenge? Speed up the game!',
         '',
-        'Type "speed 2" for 2x speed (faster & harder)',
+        'Type "speed 2" for 1.25x speed',
+        'Type "speed 3" for 1.5x speed (faster)',
         'Type "speed 1" to return to normal',
         'Type "speed 0" or "pause" to pause',
         '',
@@ -533,8 +565,11 @@ const gameState = {
   // Game mode: "endless" or "campaign"
   gameMode: 'endless',
 
-  // Speed multiplier
+  // Speed multiplier (true timescale: 1x, 1.25x, 1.5x)
   speedMultiplier: 1,
+
+  // Tower targeting mode: 'first' | 'strong' | 'weak'
+  targetMode: loadTargetingMode(),
 
   // Resources
   ram: CONFIG.START_RAM,
@@ -630,7 +665,8 @@ function initDOMElements() {
     cdSync: document.getElementById('cdSync'),
     cdKillall: document.getElementById('cdKillall'),
     gameStatus: document.getElementById('gameStatus'),
-    speedValue: document.getElementById('speedValue')
+    speedValue: document.getElementById('speedValue'),
+    targetValue: document.getElementById('targetValue')
   };
 }
 
@@ -1015,21 +1051,36 @@ const GameAPI = {
     return true;
   },
 
-  setSpeed(multiplier) {
-    if (!CONFIG.SPEED_OPTIONS.includes(multiplier)) {
-      this.log(`speed: invalid value. Use 0 (pause), 1, or 2`, 'error');
+  setSpeed(inputLevel) {
+    if (!CONFIG.SPEED_OPTIONS.includes(inputLevel)) {
+      this.log(`speed: invalid value. Use 0 (pause), 1, 2, or 3`, 'error');
       return false;
     }
 
-    if (multiplier === 0) {
+    if (inputLevel === 0) {
       gameState.paused = true;
       gameState.speedMultiplier = 1;  // Keep at 1 for when we unpause
       this.log(`speed: PAUSED (use "speed 1" to resume)`, 'warning');
     } else {
       gameState.paused = false;
-      gameState.speedMultiplier = multiplier;
-      this.log(`speed: set to ${multiplier}x`, 'success');
+      // Translate input level to actual timescale
+      gameState.speedMultiplier = CONFIG.SPEED_TIMESCALE[inputLevel];
+      this.log(`speed: set to ${gameState.speedMultiplier}x`, 'success');
     }
+    return true;
+  },
+
+  setTargetMode(mode) {
+    const normalizedMode = mode.toLowerCase();
+    if (!TARGETING_MODES.includes(normalizedMode)) {
+      this.log(`target: invalid mode (use first|strong|weak)`, 'error');
+      if (typeof playSound === 'function') playSound('cmd.error');
+      return false;
+    }
+
+    gameState.targetMode = normalizedMode;
+    saveTargetingMode(normalizedMode);
+    this.log(`target: mode set to ${normalizedMode}`, 'success');
     return true;
   },
 
@@ -1526,13 +1577,62 @@ function updateMinions(dt) {
   }
 }
 
+// Select tower target based on current targeting mode
+function selectTowerTarget() {
+  if (gameState.minions.length === 0) return null;
+
+  const mode = gameState.targetMode;
+  let minions = [...gameState.minions];
+
+  // Sort by x position (closest to core first) for tie-breaking
+  minions.sort((a, b) => a.x - b.x);
+
+  // For strong/weak modes, filter out tower-immune enemies (e.g. Heavy)
+  // This prevents towers from "wasting" shots or getting stuck on immune targets
+  if (mode === 'strong' || mode === 'weak') {
+    const damageable = minions.filter(m => {
+      const resist = CONFIG.MINIONS[m.type].towerResist;
+      return resist !== undefined && resist > 0;
+    });
+    // Only use filtered list if there are damageable targets
+    if (damageable.length > 0) {
+      minions = damageable;
+    }
+  }
+
+  switch (mode) {
+    case 'first':
+      // Closest to core (lowest x)
+      return minions[0];
+
+    case 'strong':
+      // Highest current HP, tie-breaker: closest to core
+      return minions.reduce((best, m) => {
+        if (m.hp > best.hp) return m;
+        if (m.hp === best.hp && m.x < best.x) return m;
+        return best;
+      }, minions[0]);
+
+    case 'weak':
+      // Lowest current HP, tie-breaker: closest to core
+      return minions.reduce((best, m) => {
+        if (m.hp < best.hp) return m;
+        if (m.hp === best.hp && m.x < best.x) return m;
+        return best;
+      }, minions[0]);
+
+    default:
+      return minions[0];
+  }
+}
+
 function updateTowers(dt) {
   for (const tower of gameState.towers) {
     tower.fireTimer -= dt;
 
     if (tower.fireTimer <= 0 && gameState.minions.length > 0) {
-      // Pick a random target from all minions
-      const target = gameState.minions[Math.floor(Math.random() * gameState.minions.length)];
+      // Select target based on targeting mode
+      const target = selectTowerTarget();
       if (target) {
         const minionConfig = CONFIG.MINIONS[target.type];
         const towerResist = minionConfig.towerResist !== undefined ? minionConfig.towerResist : 1.0;
@@ -2036,6 +2136,11 @@ function updateHUD() {
       hudElements.speedValue.textContent = gameState.speedMultiplier + 'x';
       hudElements.speedValue.style.color = '';  // Reset to default
     }
+  }
+
+  // Update targeting mode display
+  if (hudElements.targetValue) {
+    hudElements.targetValue.textContent = gameState.targetMode.toUpperCase();
   }
 }
 

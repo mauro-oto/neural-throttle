@@ -327,17 +327,18 @@ const MISSIONS = [
     description: "Sync command unavailable. Manage RAM carefully.",
     waveCount: 5,
     waveConfig: [
-      { count: 5, interval: 1900, weights: { grunt: 0.5, swarm: 0.35, shielded: 0.1, heavy: 0.05 }, speedScale: 0.95 },
-      { count: 6, interval: 1800, weights: { grunt: 0.45, swarm: 0.35, shielded: 0.15, heavy: 0.05 }, speedScale: 1.0 },
-      { count: 7, interval: 1700, weights: { grunt: 0.4, swarm: 0.35, shielded: 0.15, heavy: 0.1 }, speedScale: 1.05 },
-      { count: 8, interval: 1600, weights: { grunt: 0.35, swarm: 0.35, shielded: 0.2, heavy: 0.1 }, speedScale: 1.1 },
-      { count: 9, interval: 1550, weights: { grunt: 0.35, swarm: 0.35, shielded: 0.2, heavy: 0.1 }, speedScale: 1.12 }
+      // Reduced heavies significantly - they're tower-immune and drain RAM fast without sync
+      { count: 5, interval: 2000, weights: { grunt: 0.55, swarm: 0.35, shielded: 0.1, heavy: 0 }, speedScale: 0.92 },
+      { count: 5, interval: 1900, weights: { grunt: 0.52, swarm: 0.35, shielded: 0.13, heavy: 0 }, speedScale: 0.95 },
+      { count: 6, interval: 1800, weights: { grunt: 0.50, swarm: 0.35, shielded: 0.12, heavy: 0.03 }, speedScale: 1.0 },
+      { count: 6, interval: 1750, weights: { grunt: 0.47, swarm: 0.35, shielded: 0.13, heavy: 0.05 }, speedScale: 1.03 },
+      { count: 7, interval: 1700, weights: { grunt: 0.45, swarm: 0.35, shielded: 0.15, heavy: 0.05 }, speedScale: 1.05 }
     ],
     modifiers: {
       disableSync: true,
       startRam: 128,  // Full RAM to start
-      waveClearRamBonus: 70,  // More RAM on wave clear to compensate for no sync
-      startMoney: 100  // Help get towers faster
+      waveClearRamBonus: 80,  // More RAM on wave clear - only source of RAM!
+      startMoney: 110  // Help get towers faster to conserve RAM
     }
   },
   {
@@ -389,16 +390,17 @@ const MISSIONS = [
     description: "Massive assault incoming. Prove your worth.",
     waveCount: 7,
     waveConfig: [
-      { count: 8, interval: 1700, weights: { grunt: 0.35, swarm: 0.35, shielded: 0.2, heavy: 0.1 }, speedScale: 1.05 },
-      { count: 9, interval: 1600, weights: { grunt: 0.3, swarm: 0.35, shielded: 0.2, heavy: 0.15 }, speedScale: 1.1 },
-      { count: 10, interval: 1550, weights: { grunt: 0.3, swarm: 0.35, shielded: 0.2, heavy: 0.15 }, speedScale: 1.12 },
-      { count: 11, interval: 1500, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.25, heavy: 0.15 }, speedScale: 1.15 },
-      { count: 12, interval: 1450, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.25, heavy: 0.15 }, speedScale: 1.18 },
-      { count: 13, interval: 1400, weights: { grunt: 0.2, swarm: 0.35, shielded: 0.25, heavy: 0.2 }, speedScale: 1.2 },
-      { count: 14, interval: 1350, weights: { grunt: 0.2, swarm: 0.35, shielded: 0.25, heavy: 0.2 }, speedScale: 1.22 }
+      // Smoother ramp from mission 18, reduced heavies for Campaign+
+      { count: 7, interval: 1750, weights: { grunt: 0.4, swarm: 0.35, shielded: 0.18, heavy: 0.07 }, speedScale: 1.0 },
+      { count: 8, interval: 1700, weights: { grunt: 0.38, swarm: 0.35, shielded: 0.18, heavy: 0.09 }, speedScale: 1.03 },
+      { count: 9, interval: 1650, weights: { grunt: 0.35, swarm: 0.35, shielded: 0.2, heavy: 0.1 }, speedScale: 1.06 },
+      { count: 10, interval: 1600, weights: { grunt: 0.33, swarm: 0.35, shielded: 0.2, heavy: 0.12 }, speedScale: 1.09 },
+      { count: 10, interval: 1550, weights: { grunt: 0.3, swarm: 0.35, shielded: 0.22, heavy: 0.13 }, speedScale: 1.12 },
+      { count: 11, interval: 1500, weights: { grunt: 0.28, swarm: 0.35, shielded: 0.22, heavy: 0.15 }, speedScale: 1.15 },
+      { count: 12, interval: 1450, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.25, heavy: 0.15 }, speedScale: 1.18 }
     ],
     modifiers: {
-      startMoney: 105,  // Slight bump for Campaign+
+      startMoney: 115,  // More starting money for Campaign+
       startRam: 128
     }
   },
@@ -406,19 +408,19 @@ const MISSIONS = [
     id: 20,
     title: "NEURAL CORE",
     description: "Final defense. The system depends on you.",
-    waveCount: 8,
+    waveCount: 7,
     waveConfig: [
-      { count: 9, interval: 1600, weights: { grunt: 0.3, swarm: 0.35, shielded: 0.2, heavy: 0.15 }, speedScale: 1.1 },
-      { count: 10, interval: 1550, weights: { grunt: 0.3, swarm: 0.35, shielded: 0.2, heavy: 0.15 }, speedScale: 1.12 },
-      { count: 11, interval: 1500, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.25, heavy: 0.15 }, speedScale: 1.15 },
-      { count: 12, interval: 1450, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.25, heavy: 0.15 }, speedScale: 1.18 },
-      { count: 13, interval: 1400, weights: { grunt: 0.2, swarm: 0.35, shielded: 0.25, heavy: 0.2 }, speedScale: 1.2 },
-      { count: 14, interval: 1350, weights: { grunt: 0.2, swarm: 0.35, shielded: 0.25, heavy: 0.2 }, speedScale: 1.22 },
-      { count: 14, interval: 1350, weights: { grunt: 0.2, swarm: 0.35, shielded: 0.25, heavy: 0.2 }, speedScale: 1.24 },
-      { count: 15, interval: 1300, weights: { grunt: 0.2, swarm: 0.35, shielded: 0.25, heavy: 0.2 }, speedScale: 1.25 }
+      // Final mission - reduced for Campaign+ balance (enemies are +25% HP, +20% speed)
+      { count: 7, interval: 1750, weights: { grunt: 0.4, swarm: 0.38, shielded: 0.17, heavy: 0.05 }, speedScale: 1.0 },
+      { count: 8, interval: 1700, weights: { grunt: 0.38, swarm: 0.37, shielded: 0.18, heavy: 0.07 }, speedScale: 1.03 },
+      { count: 9, interval: 1650, weights: { grunt: 0.35, swarm: 0.37, shielded: 0.19, heavy: 0.09 }, speedScale: 1.06 },
+      { count: 9, interval: 1600, weights: { grunt: 0.33, swarm: 0.36, shielded: 0.2, heavy: 0.11 }, speedScale: 1.09 },
+      { count: 10, interval: 1550, weights: { grunt: 0.3, swarm: 0.36, shielded: 0.21, heavy: 0.13 }, speedScale: 1.12 },
+      { count: 11, interval: 1500, weights: { grunt: 0.28, swarm: 0.35, shielded: 0.22, heavy: 0.15 }, speedScale: 1.15 },
+      { count: 11, interval: 1475, weights: { grunt: 0.25, swarm: 0.35, shielded: 0.25, heavy: 0.15 }, speedScale: 1.18 }
     ],
     modifiers: {
-      startMoney: 110,  // Slight bump for Campaign+
+      startMoney: 125,  // More starting money for the finale
       startRam: 128
     }
   }
